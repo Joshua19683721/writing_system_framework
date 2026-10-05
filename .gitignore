@@ -1,0 +1,21 @@
+# 開發過程的暫存檔（單檔應用不需要分檔）
+_*.js
+_*.html
+_*.tmp
+_appendix.tmp
+
+# 本機機密 / 環境變數（保險起見）
+.env
+.env.local
+*.key
+*.pem
+
+# 作業系統
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 編輯器
+.vscode/
+.idea/
+*.swp

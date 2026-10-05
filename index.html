@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="為國小四年級學生設計的先說後寫作文練習系統：先口述、再被提問、最後生成國中會考架構文章">
+<title>🎒 國文會考魔法寫作小幫手</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root { color-scheme: light; }
+  html { scroll-behavior: smooth; }
+  body { -webkit-tap-highlight-color: transparent; }
+  @keyframes floaty { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+  @keyframes popIn { from { opacity: 0; transform: scale(.94) } to { opacity: 1; transform: none } }
+  @keyframes spinSlow { to { transform: rotate(360deg) } }
+  .anim-floaty { animation: floaty 2.6s ease-in-out infinite; }
+  .anim-fade { animation: fadeUp .35s ease-out both; }
+  .anim-pop { animation: popIn .25s ease-out both; }
+  .anim-spin { animation: spinSlow 1.1s linear infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .anim-floaty, .anim-fade, .anim-pop, .anim-spin { animation: none !important; }
+  }
+  textarea, input, button { font-family: inherit; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .topic-chip[aria-pressed="true"] { background:#4f46e5; color:#fff; border-color:#4f46e5; box-shadow:0 6px 18px -6px rgba(79,70,229,.7); }
+  #rawText { line-height: 1.9; }
+  .writing { line-height: 2.05; letter-spacing: .01em; }
+  @media print {
+    body { background:#fff !important; }
+    .no-print { display: none !important; }
+    body * { visibility: hidden !important; }
+    #printArea, #printArea * { visibility: visible !important; }
+    #printArea { position: absolute; left:0; top:0; width:100%; }
+    #printArea .print-plain { box-shadow:none !important; }
+    #printMeta { display:block !important; }
+  }
+</style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800 p-3 md:p-8">
+<div class="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border-4 border-indigo-100 p-5 md:p-10 space-y-8">
+
+  <header class="no-print border-b-2 border-slate-100 pb-5">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-black text-indigo-900 tracking-wide">🎒 國文會考魔法寫作小幫手</h1>
+        <p class="text-slate-500 font-bold mt-1 text-sm sm:text-base">小學四年級 專用思辨與表達系統</p>
+      </div>
+      <button type="button" id="settingsToggle" aria-expanded="false" aria-controls="settingsPanel" class="shrink-0 bg-amber-100 hover:bg-amber-200 text-amber-900 font-black px-4 py-2 rounded-2xl border-2 border-amber-200 transition">⚙️ 設定</button>
+    </div>
+    <div id="settingsPanel" class="hidden mt-5 bg-amber-50 border-2 border-amber-200 p-4 rounded-2xl space-y-4">
+      <div class="grid gap-4 md:grid-cols-2">
+        <div>
+          <label for="apiKey" class="block text-xs font-black text-amber-800 mb-1">🔑 Groq API Key</label>
+          <div class="flex gap-2">
+            <input type="password" id="apiKey" autocomplete="off" spellcheck="false" placeholder="gsk_..." class="flex-1 min-w-0 px-3 py-2 text-sm border-2 border-amber-200 rounded-xl bg-white focus:outline-none focus:border-amber-500">
+            <button type="button" id="saveKeyBtn" class="bg-amber-500 text-white font-black px-3 py-2 rounded-xl text-sm hover:bg-amber-600 transition">儲存</button>
+            <button type="button" id="clearKeyBtn" class="bg-white text-amber-700 font-black px-3 py-2 rounded-xl text-sm border-2 border-amber-200 hover:bg-amber-100 transition">清除</button>
+          </div>
+          <p id="keyStatus" class="text-xs mt-1 font-bold text-amber-700" role="status"></p>
+        </div>
+        <div>
+          <label for="modelInput" class="block text-xs font-black text-amber-800 mb-1">🧠 模型名稱</label>
+          <input type="text" id="modelInput" list="modelList" spellcheck="false" class="w-full px-3 py-2 text-sm border-2 border-amber-200 rounded-xl bg-white focus:outline-none focus:border-amber-500">
+          <datalist id="modelList">
+            <option value="llama-3.3-70b-versatile"></option>
+            <option value="llama-3.1-8b-instant"></option>
+            <option value="openai/gpt-oss-120b"></option>
+          </datalist>
+          <p class="text-xs mt-1 text-amber-700">預設 llama-3.3-70b-versatile（繁體中文品質最好）。最新清單見 console.groq.com/docs/models</p>
+        </div>
+      </div>
+      <p class="text-xs text-amber-800 bg-amber-100/60 rounded-xl p-2 leading-relaxed">🔒 你的 API Key 只存在「這台電腦的瀏覽器」裡（localStorage），不會上傳到任何伺服器。請不要在公用電腦上儲存，用完記得按「清除」。</p>
+    </div>
+  </header>
+
+  <section id="step1" class="space-y-6 anim-fade">
+    <div class="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100">
+      <h2 class="text-lg sm:text-xl font-black text-indigo-900 mb-3">📍 選擇今天的練習主題</h2>
+      <div id="topicChips" class="flex flex-wrap gap-3">
+        <button type="button" class="topic-chip bg-white border-2 border-indigo-200 text-indigo-800 font-bold px-4 py-2 rounded-xl hover:border-indigo-400 transition" data-topic="一次印象深刻的比賽" aria-pressed="false">🏆 一次印象深刻的比賽</button>
+        <button type="button" class="topic-chip bg-white border-2 border-indigo-200 text-indigo-800 font-bold px-4 py-2 rounded-xl hover:border-indigo-400 transition" data-topic="記一次和朋友的誤會" aria-pressed="false">🤝 記一次和朋友的誤會</button>
+        <button type="button" class="topic-chip bg-white border-2 border-indigo-200 text-indigo-800 font-bold px-4 py-2 rounded-xl hover:border-indigo-400 transition" data-topic="最難忘的一個雨天" aria-pressed="false">🌧️ 最難忘的一個雨天</button>
+        <button type="button" class="topic-chip bg-white border-2 border-indigo-200 text-indigo-800 font-bold px-4 py-2 rounded-xl hover:border-indigo-400 transition" data-topic="__custom__" aria-pressed="false">✏️ 自訂主題</button>
+      </div>
+      <div id="customTopicWrap" class="hidden mt-3">
+        <input type="text" id="customTopic" maxlength="30" placeholder="例如：我最喜歡的一個週末" class="w-full px-4 py-2 border-2 border-indigo-200 rounded-xl bg-white focus:outline-none focus:border-indigo-500">
+      </div>
+    </div>
+
+    <div class="space-y-3">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <label for="rawText" class="text-lg font-black text-slate-800">🎙️ 第一步：把你想說的話講出來或貼上來</label>
+        <span class="text-sm font-bold text-slate-400"><span id="charCount">0</span> 字</span>
+      </div>
+      <span id="topicBadge" class="hidden inline-block bg-indigo-100 text-indigo-800 text-sm font-bold px-3 py-1 rounded-full"></span>
+      <textarea id="rawText" rows="6" spellcheck="false" class="w-full text-lg p-4 border-2 border-slate-200 rounded-2xl focus:border-indigo-500 focus:outline-none" placeholder="例如：上個星期六我和同學去打籃球，我們本來輸三球，後來我很努力投進一個三分球，最後我們贏了，我覺得美不勝收，非常開心..."></textarea>
+      <p id="interim" class="text-sm italic text-rose-500 min-h-[1.25rem]" aria-live="polite"></p>
+      <p class="text-sm text-emerald-700 font-bold">💡 不用擔心寫錯字，像跟朋友聊天一樣，把發生的事情講出來就好喔！</p>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2">
+      <button type="button" id="micBtn" class="bg-rose-500 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🎙️ 按下開始說話</button>
+      <button type="button" id="clearBtn" class="bg-white text-slate-600 text-lg font-black py-4 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition">🧹 清除重打</button>
+      <button type="button" id="toNode1Btn" class="sm:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🚀 送出，進行思辨提問</button>
+    </div>
+    <div id="step1Error"></div>
+    <p id="speechUnsupported" class="hidden text-sm text-amber-700 bg-amber-50 border-2 border-amber-200 rounded-xl p-3 font-bold"></p>
+  </section>
+
+  <section id="step2" class="hidden space-y-6 bg-emerald-50 p-5 md:p-6 rounded-3xl border-2 border-emerald-200 anim-fade">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl anim-floaty">🤖</span>
+      <div>
+        <h2 class="text-lg sm:text-xl font-black text-emerald-900">魔法導師提問時間！</h2>
+        <p id="node1Praise" class="text-emerald-800 font-bold mt-0.5"></p>
+      </div>
+    </div>
+    <div id="questionsContainer" class="space-y-4"></div>
+    <p class="text-sm text-emerald-700 font-bold">💡 不會回答也沒關係！先寫你想到的片段，剩下留給導師幫你想。</p>
+    <div id="step2Error"></div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <button type="button" id="backToStep1Btn" class="bg-white text-emerald-800 text-lg font-black py-4 rounded-2xl border-2 border-emerald-200 hover:bg-emerald-50 transition">⬅️ 回去修改口述</button>
+      <button type="button" id="toNode23Btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">➡️ 填好了，生成寫作診斷卡</button>
+      <button type="button" id="regenQuestionsBtn" class="sm:col-span-2 bg-white text-emerald-800 font-bold py-3 rounded-2xl border-2 border-emerald-200 hover:bg-emerald-50 transition">🔄 問題不好答？請導師換兩個問題</button>
+    </div>
+  </section>
+
+  <section id="step3" class="hidden space-y-6">
+    <div id="printArea" class="space-y-6">
+      <p id="printMeta" class="hidden text-center text-sm text-slate-600 mb-2"></p>
+      <div class="bg-amber-50 border-2 border-amber-200 rounded-3xl p-5 md:p-6 space-y-5 print-plain">
+        <h2 class="text-xl sm:text-2xl font-black text-amber-900">✨ 你的作文診斷卡</h2>
+        <div class="space-y-2">
+          <h3 class="font-black text-base sm:text-lg text-emerald-800">🌟 做得很好的地方（Keep）</h3>
+          <ul id="keepList" class="list-disc list-inside text-slate-700 space-y-1.5 font-medium leading-relaxed"></ul>
+        </div>
+        <div class="space-y-2">
+          <h3 class="font-black text-base sm:text-lg text-rose-800">💡 可以更好的地方（Change）</h3>
+          <ul id="changeList" class="list-disc list-inside text-slate-700 space-y-1.5 font-medium leading-relaxed"></ul>
+        </div>
+      </div>
+      <div class="bg-indigo-50 border-2 border-indigo-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
+        <h3 class="text-lg sm:text-xl font-black text-indigo-900">📝 幫你整理好的會考架構文章</h3>
+        <div id="finalDraft" class="writing bg-white border border-indigo-100 rounded-2xl p-5 text-lg text-slate-800 whitespace-pre-wrap"></div>
+        <p id="wordCountNote" class="text-sm font-bold text-slate-500"></p>
+      </div>
+    </div>
+    <div class="no-print space-y-3">
+      <div id="step3Error"></div>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <button type="button" id="copyArticleBtn" class="bg-white text-indigo-700 font-black py-3 rounded-2xl border-2 border-indigo-200 hover:bg-indigo-50 transition">📋 複製文章</button>
+        <button type="button" id="printBtn" class="bg-white text-indigo-700 font-black py-3 rounded-2xl border-2 border-indigo-200 hover:bg-indigo-50 transition">🖨️ 列印 / 存成 PDF</button>
+        <button type="button" id="backToStep2Btn" class="bg-white text-emerald-700 font-black py-3 rounded-2xl border-2 border-emerald-200 hover:bg-emerald-50 transition">⬅️ 回去改回答</button>
+        <button type="button" id="restartBtn" class="bg-slate-700 hover:bg-slate-800 text-white font-black py-3 rounded-2xl transition">🔄 重新練習另一篇</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="no-print text-center text-xs text-slate-400 pt-2 border-t border-slate-100">先說後寫 · 三步驟思辨練習 ｜ 你的內容與 API Key 都只留在這台電腦</footer>
+</div>
+
+<div id="loadingOverlay" class="no-print hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-6" role="alert" aria-live="assertive">
+  <div class="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center space-y-4">
+    <div class="text-6xl anim-floaty">🤖</div>
+    <p id="loadingText" class="text-lg font-black text-indigo-900">魔法導師思考中…</p>
+    <div class="w-10 h-10 mx-auto border-4 border-indigo-200 border-t-indigo-600 rounded-full anim-spin"></div>
+    <p class="text-sm text-slate-500 font-bold">平常要 10～30 秒，請耐心等一下喔！</p>
+    <button type="button" id="cancelBtn" class="text-sm font-bold text-slate-500 underline hover:text-slate-800">取消</button>
+  </div>
+</div>
+
+<div id="toastStack" class="no-print fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] space-y-2 w-[min(92vw,28rem)] pointer-events-none"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. System Prompts —— 與 writing_system_framework.md 第 2 章一致
+     ============================================================ */
+
+  var PROMPT_NODE1 = [
+    '你是一位極具親和力、專門輔導國小四年級學生的國文會考寫作導師。',
+    '你的任務是閱讀孩子發送的初稿或口述逐字稿，提取出 key point，並提出 2 個「具體、有畫面感、容易回答」的引導問題。',
+    '',
+    '【提問原則】：',
+    '1. 語氣熱情、多用鼓勵性詞彙與表情符號（如 🤖, 💡, ✨）。',
+    '2. 問題 1 必須鎖定「五感描寫」或「身體／心理細節」（例如：當時聽到什麼聲音？手心有沒有冒汗？）。',
+    '3. 問題 2 必須鎖定「事情發生的轉折」或「因果關係」（例如：為什麼突然改變主意？當時大家做了什麼行動？）。',
+    '4. 不要一次問超過 2 個問題，題目要短，適合 10 歲小孩閱讀。',
+    '',
+    '【語言與格式規範】：',
+    '1. 全部使用繁體中文（台灣用字），不得使用簡體字。',
+    '2. 只輸出合法 JSON，不要加任何解釋文字、註解或 Markdown 符號。',
+    '',
+    '【輸出 JSON 格式】：',
+    '{',
+    '  "praise": "讚美孩子口述內容中的一個亮點（約 30 字）",',
+    '  "questions": [',
+    '    { "id": "q1", "question_text": "第一個引導問題", "placeholder": "舉例：例如看到大家的眼神…或聽到歡呼聲…" },',
+    '    { "id": "q2", "question_text": "第二個引導問題", "placeholder": "舉例：例如因為大家決定互相幫忙…" }',
+    '  ]',
+    '}'
+  ].join('\n');
+
+  var PROMPT_NODE23 = [
+    '你是一位國文會考寫作專家。請結合「學生的初始口述」與「學生回答的引導問題」，進行作文邏輯優化與 K/C (Keep / Change) 回饋。',
+    '',
+    '【分析標準】：',
+    '1. Keep (讚優點)：找出 2 個具體寫得好的地方（如：描寫真實、動態生動、真情實感）。',
+    '2. Change (改細節)：',
+    '   - 抓出濫用成語（如：美不勝收、開心極了）並給予替代方案。',
+    '   - 補充因果鏈斷層，讓邏輯更通順。',
+    '3. 文章重構成型 (Draft)：',
+    '   - 將內容整理為「國中會考架構格式」（段落分明、起承轉合）。',
+    '   - 保留孩子原本的意思與口吻，僅修飾語病與強化細節。',
+    '',
+    '【語言與格式規範】：',
+    '1. 全部使用繁體中文（台灣用字），不得使用簡體字。',
+    '2. 只輸出合法 JSON，不要加任何解釋文字或 Markdown 符號。',
+    '3. final_article 段落之間用換行分隔，不要加小標題、序號或項目符號。',
+    '4. 若孩子的口述或回答資訊不足，請就現有素材補足合理的場景細節，不要寫出與孩子無關的新事件。',
+    '',
+    '【輸出 JSON 格式】：',
+    '{',
+    '  "keeps": ["【感情真實】寫出了從落後到逆轉勝的真實過程！", "【細節生動】補充了關鍵聲音與動作描寫！"],',
+    '  "changes": ["⚠️ 詞彙微調：「美不勝收」通常用來形容風景，這裡建議換成「心裡高興得跳起來」。", "🔗 因果連貫：補上了因為氣氛緊張，所以大家決定重新調整策略的細節。"],',
+    '  "final_article": "重構後的完整會考優化作文..."',
+    '}'
+  ].join('\n');
+
+  /* ============================================================
+     2. 設定
+     ============================================================ */
+
+  var CONFIG = {
+    endpoint: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile',
+    temperature: 0.7,
+    maxTokens: 2048,
+    timeoutMs: 60000,
+    maxAttempts: 3
+  };
+
+  var FOCUS_TAGS = ['👀 五感／心理細節', '🔗 轉折／因果關係'];
+  var DEFAULT_PLACEHOLDERS = [
+    '例如：好像聽到球鞋摩擦地板的吱吱聲…',
+    '例如：因為隊長叫大家換位置，所以…'
+  ];
+  var TOPIC_CUSTOM = '__custom__';
+
+  var NO_KEY_MSG = '還沒有設定 Groq API Key 喔！請按右上角「⚙️ 設定」貼上你的 Key（gsk_ 開頭）。';
+
+  /* ============================================================
+     3. 小工具
+     ============================================================ */
+
+  function $(id) { return document.getElementById(id); }
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  function backoffMs(attempt) { return 1000 * Math.pow(2, attempt - 1); }
+
+  function firstString() {
+    for (var i = 0; i < arguments.length; i++) {
+      var v = arguments[i];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+  }
+
+  var store = {
+    get: function (k) { try { return window.localStorage.getItem('wsm.' + k); } catch (e) { return null; } },
+    set: function (k, v) { try { window.localStorage.setItem('wsm.' + k, v); } catch (e) { /* ignore */ } },
+    del: function (k) { try { window.localStorage.removeItem('wsm.' + k); } catch (e) { /* ignore */ } },
+    clearDraft: function () {
+      ['draft', 'topic', 'customTopic', 'a-q1', 'a-q2'].forEach(function (k) { store.del(k); });
+    }
+  };
+
+  function AppError(message, code, retryable) {
+    var e = new Error(message);
+    e.name = 'AppError';
+    e.code = code || 'unknown';
+    e.retryable = !!retryable;
+    return e;
+  }
+
+  function isAppError(e) { return !!e && e.name === 'AppError'; }
+
+  /* ============================================================
+     4. Groq API 呼叫（含逾時、重試、錯誤降級）
+     ============================================================ */
+
+  var activeController = null;
+  var userAborted = false;
+
+  function groqMessage(bodyText) {
+    if (!bodyText) return '';
+    try {
+      var j = JSON.parse(bodyText);
+      if (j && j.error && j.error.message) return String(j.error.message).slice(0, 160);
+    } catch (e) { /* 不是 JSON */ }
+    return String(bodyText).replace(/\s+/g, ' ').slice(0, 160);
+  }
+
+  function mapHttpError(status, bodyText) {
+    if (status === 401 || status === 403) {
+      return AppError('API Key 不正確或已過期，請到「⚙️ 設定」重新貼上。', 'auth', false);
+    }
+    if (status === 404) {
+      return AppError('找不到這個模型（' + (store.get('model') || CONFIG.model) + '），請到「⚙️ 設定」換一個模型名稱。', 'no-model', false);
+    }
+    if (status === 429) {
+      return AppError('請求太頻繁或免費額度用完囉，請等一下再試一次。', 'rate', true);
+    }
+    if (status >= 500) {
+      return AppError('Groq 伺服器暫時有問題，請稍後再試一次。', 'server', true);
+    }
+    return AppError('API 回應錯誤（HTTP ' + status + '）：' + groqMessage(bodyText), 'api', false);
+  }
+
+  function requestOnce(key, systemPrompt, userContent, useJsonMode) {
+    var controller = new AbortController();
+    activeController = controller;
+    var timer = setTimeout(function () { controller.abort(); }, CONFIG.timeoutMs);
+
+    var body = {
+      model: store.get('model') || CONFIG.model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      temperature: CONFIG.temperature,
+      max_tokens: CONFIG.maxTokens
+    };
+    if (useJsonMode) body.response_format = { type: 'json_object' };
+
+    return fetch(CONFIG.endpoint, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        clearTimeout(timer);
+        if (!res.ok) {
+          if (useJsonMode && res.status === 400 && /response_format|json_object|json_schema/i.test(text)) {
+            throw AppError('這個模型不支援 JSON 模式，改用純提示詞重試。', 'no-json-mode', true);
+          }
+          throw mapHttpError(res.status, text);
+        }
+        var data;
+        try { data = JSON.parse(text); }
+        catch (e) { throw AppError('伺服器回應不是合法 JSON，請再試一次。', 'api', true); }
+        var content = data && data.choices && data.choices[0] && data.choices[0].message
+          ? data.choices[0].message.content : '';
+        if (typeof content !== 'string' || !content.trim()) {
+          throw AppError('導師這次沒有說話，請再試一次。', 'empty', true);
+        }
+        return content;
+      });
+    }).catch(function (err) {
+      clearTimeout(timer);
+      if (err && err.name === 'AbortError') {
+        if (userAborted) throw AppError('已取消這次請求。', 'cancel', false);
+        throw AppError('等太久了，連線逾時。請檢查網路後再試一次。', 'timeout', true);
+      }
+      if (isAppError(err)) throw err;
+      throw AppError('連不上 Groq 伺服器，請確認網路連線後再試。', 'network', true);
+    }).finally(function () {
+      activeController = null;
+    });
+  }
+
+  function callGroq(systemPrompt, userContent) {
+    var key = store.get('key');
+    if (!key) return Promise.reject(AppError(NO_KEY_MSG, 'no-key', false));
+
+    var useJsonMode = true;
+    var attempt = 0;
+    var lastErr = null;
+
+    function loop() {
+      attempt += 1;
+      return requestOnce(key, systemPrompt, userContent, useJsonMode).catch(function (err) {
+        lastErr = err;
+        if (err.code === 'no-json-mode') { useJsonMode = false; return loop(); }
+        if (err.code === 'cancel') throw err;
+        if (err.retryable && attempt < CONFIG.maxAttempts) {
+          return sleep(backoffMs(attempt)).then(loop);
+        }
+        throw err;
+      });
+    }
+
+    return loop().catch(function () { throw lastErr; });
+  }
+
+  /* ============================================================
+     5. JSON 解析與欄位正規化（模型偶發回傳怪格式時的保險）
+     ============================================================ */
+
+  var TICK = String.fromCharCode(96);
+  var FENCE_RE = new RegExp(
+    '^' + TICK + TICK + TICK + '(?:json)?\\s*([\\s\\S]*?)\\s*' + TICK + TICK + TICK + '$', 'i');
+
+  function extractJson(raw) {
+    var text = String(raw == null ? '' : raw).trim();
+    var m = text.match(FENCE_RE);
+    if (m) text = m[1].trim();
+    if (text.charAt(0) === '{' && text.charAt(text.length - 1) === '}') {
+      try { return JSON.parse(text); } catch (e) { /* 繼續掃描 */ }
+    }
+    var start = text.indexOf('{');
+    var end = text.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      try { return JSON.parse(text.slice(start, end + 1)); } catch (e) { /* ignore */ }
+    }
+    throw AppError('導師回傳的格式我讀不懂，請按「再試一次」重新產生。', 'bad-json', true);
+  }
+
+  function toTextList(v) {
+    if (v == null) return [];
+    var arr = Array.isArray(v) ? v : [v];
+    var out = [];
+    for (var i = 0; i < arr.length; i++) {
+      var item = arr[i];
+      var s = '';
+      if (typeof item === 'string') s = item;
+      else if (item && typeof item === 'object') {
+        s = firstString(item.text, item.content, item.description, item.point);
+      }
+      if (s.trim()) out.push(s.trim());
+    }
+    return out;
+  }
+
+  function normalizeNode1(data) {
+    if (!data || typeof data !== 'object') {
+      throw AppError('導師回傳的內容不完整，請再試一次。', 'bad-shape', true);
+    }
+    var out = { praise: '', questions: [] };
+
+    out.praise = firstString(data.praise, data.encourage, data.comment)
+      || '你把這件事講得很清楚，讓人一聽就懂！';
+
+    var rawQs = Array.isArray(data.questions) ? data.questions
+      : (data.questions ? [data.questions] : []);
+    if (!rawQs.length) {
+      var flat = [];
+      if (data.q1) flat.push(data.q1);
+      if (data.q2) flat.push(data.q2);
+      rawQs = flat;
+    }
+
+    for (var i = 0; i < rawQs.length && out.questions.length < 2; i++) {
+      var q = rawQs[i];
+      var idx = out.questions.length;
+      var text = '';
+      var ph = '';
+      if (typeof q === 'string') {
+        text = q.trim();
+      } else if (q && typeof q === 'object') {
+        text = firstString(q.question_text, q.question, q.text, q.title);
+        ph = firstString(q.placeholder, q.example, q.hint);
+      }
+      if (!text) continue;
+      out.questions.push({
+        id: 'q' + (idx + 1),
+        text: text,
+        placeholder: ph || DEFAULT_PLACEHOLDERS[idx] || ''
+      });
+    }
+
+    while (out.questions.length < 2) {
+      var at = out.questions.length;
+      out.questions.push({
+        id: 'q' + (at + 1),
+        text: at === 0
+          ? '那時候你最清楚的畫面是什麼？有聽到什麼聲音嗎？'
+          : '事情後來為什麼會變成這樣？你覺得是因為什麼？',
+        placeholder: DEFAULT_PLACEHOLDERS[at] || ''
+      });
+    }
+    return out;
+  }
+
+  function normalizeNode23(data) {
+    if (!data || typeof data !== 'object') {
+      throw AppError('導師回傳的內容不完整，請再試一次。', 'bad-shape', true);
+    }
+    var article = firstString(data.final_article, data.finalArticle, data.article, data.draft);
+    if (!article) {
+      throw AppError('這次沒有拿到完整的文章，請按「再試一次」重新產生。', 'bad-shape', true);
+    }
+    return {
+      keeps: toTextList(data.keeps != null ? data.keeps : data.keep),
+      changes: toTextList(data.changes != null ? data.changes : data.change),
+      final_article: article
+    };
+  }
+
+  /* ============================================================
+     6. UI 工具
+     ============================================================ */
+
+  var els = {};
+
+  function toast(msg, kind) {
+    var stack = $('toastStack');
+    if (!stack) return;
+    var styles = { ok: 'bg-emerald-600', err: 'bg-rose-600', info: 'bg-slate-800' };
+    var el = document.createElement('div');
+    el.className = 'pointer-events-auto rounded-2xl px-4 py-3 font-bold shadow-lg text-sm text-white '
+      + (styles[kind] || styles.info);
+    el.setAttribute('role', 'status');
+    el.textContent = msg;
+    stack.appendChild(el);
+    setTimeout(function () {
+      el.style.transition = 'opacity .3s';
+      el.style.opacity = '0';
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 320);
+    }, 3000);
+  }
+
+  function showError(containerId, message, onRetry) {
+    var box = $(containerId);
+    if (!box) return;
+    box.textContent = '';
+    var wrap = document.createElement('div');
+    wrap.className = 'anim-pop flex flex-wrap items-center gap-3 bg-rose-50 border-2 border-rose-200 text-rose-900 rounded-2xl p-3 font-bold';
+    var span = document.createElement('span');
+    span.className = 'flex-1 min-w-[12rem]';
+    span.textContent = '😵 ' + message;
+    wrap.appendChild(span);
+    if (onRetry) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl font-black shrink-0';
+      btn.textContent = '🔄 再試一次';
+      btn.addEventListener('click', onRetry);
+      wrap.appendChild(btn);
+    }
+    box.appendChild(wrap);
+  }
+
+  function clearError(containerId) {
+    var box = $(containerId);
+    if (box) box.textContent = '';
+  }
+
+  function showLoading(text) {
+    userAborted = false;
+    $('loadingText').textContent = text;
+    $('loadingOverlay').classList.remove('hidden');
+  }
+
+  function hideLoading() {
+    $('loadingOverlay').classList.add('hidden');
+  }
+
+  function openSettings() {
+    $('settingsPanel').classList.remove('hidden');
+    $('settingsToggle').setAttribute('aria-expanded', 'true');
+    setTimeout(function () { els.apiKey.focus(); }, 50);
+  }
+
+  function setKeyStatus(msg) {
+    $('keyStatus').textContent = msg || (store.get('key') ? '✅ 已儲存 API Key（留在這台電腦）' : '尚未設定');
+  }
+
+  function currentTopic() {
+    var t = store.get('topic') || '';
+    if (t === TOPIC_CUSTOM) return (store.get('customTopic') || '').trim();
+    return t;
+  }
+
+  function updateBadge() {
+    var t = currentTopic();
+    if (t) {
+      els.badge.textContent = '📌 練習主題：' + t;
+      els.badge.classList.remove('hidden');
+    } else {
+      els.badge.textContent = '';
+      els.badge.classList.add('hidden');
+    }
+  }
+
+  function updateCount() {
+    els.charCount.textContent = String(els.rawText.value.trim().length);
+  }
+
+  function showStep(n) {
+    ['step1', 'step2', 'step3'].forEach(function (id, i) {
+      var el = $(id);
+      var on = (i + 1) === n;
+      el.classList.toggle('hidden', !on);
+      if (on) {
+        el.classList.remove('anim-fade');
+        void el.offsetWidth;
+        el.classList.add('anim-fade');
+      }
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function fillList(ul, items, emptyText) {
+    while (ul.firstChild) ul.removeChild(ul.firstChild);
+    if (!items.length) {
+      var li = document.createElement('li');
+      li.className = 'text-slate-400';
+      li.textContent = emptyText;
+      ul.appendChild(li);
+      return;
+    }
+    items.forEach(function (t) {
+      var item = document.createElement('li');
+      item.textContent = t;
+      ul.appendChild(item);
+    });
+  }
+
+  function renderQuestions(node1) {
+    var box = $('questionsContainer');
+    box.textContent = '';
+    node1.questions.forEach(function (q, idx) {
+      var card = document.createElement('div');
+      card.className = 'anim-pop bg-white border-2 border-emerald-100 rounded-2xl p-4 space-y-2';
+
+      var label = document.createElement('label');
+      label.className = 'block font-black text-emerald-900';
+      label.setAttribute('for', q.id);
+      label.textContent = '❓ 問題 ' + (idx + 1) + '：' + q.text;
+
+      var tag = document.createElement('span');
+      tag.className = 'ml-2 align-middle text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full';
+      tag.textContent = FOCUS_TAGS[idx] || '';
+      label.appendChild(tag);
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.id = q.id;
+      input.placeholder = q.placeholder;
+      input.className = 'w-full p-3 text-base border-2 border-slate-200 rounded-xl focus:border-emerald-500 focus:outline-none';
+      var saved = store.get('a-' + q.id);
+      if (saved) input.value = saved;
+      input.addEventListener('input', function () { store.set('a-' + q.id, input.value); });
+
+      card.appendChild(label);
+      card.appendChild(input);
+      box.appendChild(card);
+    });
+    $('node1Praise').textContent = node1.praise;
+  }
+
+  function answerText(id) {
+    var el = $(id);
+    return el && typeof el.value === 'string' ? el.value.trim() : '';
+  }
+
+  /* ============================================================
+     7. 兩個 Node 的執行流程
+     ============================================================ */
+
+  function handleError(e, containerId, retryFn) {
+    if (!isAppError(e)) e = AppError('發生未預期的錯誤，請再試一次。', 'unknown', true);
+    if (e.code === 'cancel') { toast('已取消這次的請求。', 'info'); return; }
+    if (e.code === 'no-key') { showError(containerId, e.message); openSettings(); return; }
+    showError(containerId, e.message, e.retryable ? retryFn : null);
+  }
+
+  function runNode1() {
+    var text = els.rawText.value.trim();
+    if (text.length < 2) {
+      toast('先寫一點點想說的話，再送出喔！', 'err');
+      els.rawText.focus();
+      return Promise.resolve();
+    }
+    var topic = currentTopic();
+    clearError('step1Error');
+    showLoading('魔法導師正在讀你的故事…');
+
+    var userContent = [
+      '【練習主題】' + (topic || '（孩子自由發揮，請依內容判斷）'),
+      '',
+      '【孩子的口述／初稿內容】',
+      text
+    ].join('\n');
+
+    return callGroq(PROMPT_NODE1, userContent).then(function (raw) {
+      var node1 = normalizeNode1(extractJson(raw));
+      renderQuestions(node1);
+      showStep(2);
+    }).catch(function (e) {
+      handleError(e, 'step1Error', runNode1);
+    }).finally(function () {
+      hideLoading();
+    });
+  }
+
+  function runNode23() {
+    var text = els.rawText.value.trim();
+    if (text.length < 2) {
+      toast('剛才的內容不見了，請回到第一步重新輸入。', 'err');
+      showStep(1);
+      return Promise.resolve();
+    }
+    clearError('step2Error');
+    showLoading('魔法導師正在幫你整理文章…');
+
+    var topic = currentTopic();
+    var q1 = answerText('q1');
+    var q2 = answerText('q2');
+    if (!q1 && !q2) {
+      toast('沒關係！導師會用你原本的內容來幫你想。', 'info');
+    }
+
+    var userContent = [
+      '【練習主題】' + (topic || '（孩子自由發揮）'),
+      '',
+      '【孩子的口述／初稿內容】',
+      text,
+      '',
+      '【孩子回答問題 1（五感／心理細節）】',
+      q1 || '（孩子還沒回答，請勿臆造孩子的回答，但可依口述內容補充合理細節）',
+      '',
+      '【孩子回答問題 2（轉折／因果關係）】',
+      q2 || '（孩子還沒回答，請勿臆造孩子的回答，但可依口述內容補充合理細節）'
+    ].join('\n');
+
+    return callGroq(PROMPT_NODE23, userContent).then(function (raw) {
+      var result = normalizeNode23(extractJson(raw));
+      fillList($('keepList'), result.keeps, '（這次導師沒有特別建議，代表你寫得很完整！）');
+      fillList($('changeList'), result.changes, '（沒有發現需要修改的地方，非常棒！）');
+      $('finalDraft').textContent = result.final_article;
+
+      var n = result.final_article.replace(/\s+/g, '').length;
+      $('wordCountNote').textContent = '全文約 ' + n + ' 字'
+        + (n >= 400 && n <= 600
+          ? ' ✅ 剛好落在會考建議的 400～600 字之間！'
+          : '（國中會考作文建議 400～600 字，可以再想想要不要補充細節喔）');
+
+      var t = currentTopic();
+      $('printMeta').textContent = (t ? '練習主題：' + t : '自由練習')
+        + '　｜　' + new Date().toLocaleDateString('zh-TW');
+
+      showStep(3);
+    }).catch(function (e) {
+      handleError(e, 'step2Error', runNode23);
+    }).finally(function () {
+      hideLoading();
+    });
+  }
+
+  /* ============================================================
+     8. 語音輸入
+     ============================================================ */
+
+  var recognition = null;
+  var listening = false;
+
+  function micLabel(on) {
+    els.mic.textContent = on ? '⏹️ 說完了，按此停止' : '🎙️ 按下開始說話';
+    els.mic.classList.toggle('bg-rose-700', on);
+    els.mic.classList.toggle('bg-rose-500', !on);
+  }
+
+  function appendText(t) {
+    var s = String(t || '').trim();
+    if (!s) return;
+    var sep = els.rawText.value && !/[\s，。！？]$/.test(els.rawText.value) ? '，' : '';
+    els.rawText.value = els.rawText.value + sep + s;
+    updateCount();
+    store.set('draft', els.rawText.value);
+  }
+
+  function setupSpeech() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      els.mic.classList.add('hidden');
+      var warn = $('speechUnsupported');
+      warn.textContent = '🎙️ 這個瀏覽器不支援語音輸入（Chrome、Edge 才有）。請直接用打字方式輸入，或改用 Chrome 開啟這份檔案。';
+      warn.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      recognition = new SR();
+    } catch (e) {
+      recognition = null;
+      els.mic.classList.add('hidden');
+      $('speechUnsupported').textContent = '🎙️ 語音功能啟動失敗，請改用打字方式輸入。';
+      $('speechUnsupported').classList.remove('hidden');
+      return;
+    }
+
+    recognition.lang = 'zh-TW';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = function () { listening = true; micLabel(true); };
+
+    recognition.onend = function () {
+      listening = false;
+      micLabel(false);
+      $('interim').textContent = '';
+    };
+
+    recognition.onerror = function (ev) {
+      var map = {
+        'no-speech': '沒有聽到聲音，請再靠近麥克風說一次。',
+        'not-allowed': '麥克風權限被拒絕了，請在瀏覽器網址列允許麥克風。',
+        'service-not-allowed': '語音辨識服務不可用，請改用打字輸入。',
+        'audio-capture': '找不到麥克風，請檢查你的裝置。',
+        'network': '語音辨識需要網路，請確認連線正常。'
+      };
+      toast(map[ev.error] || '語音輸入發生問題，請改用打字輸入。', 'err');
+    };
+
+    recognition.onresult = function (ev) {
+      var interim = '';
+      for (var i = ev.resultIndex; i < ev.results.length; i++) {
+        var r = ev.results[i];
+        if (r.isFinal) appendText(r[0].transcript);
+        else interim += r[0].transcript;
+      }
+      $('interim').textContent = interim ? '（聽到你說：' + interim + '）' : '';
+    };
+
+    els.mic.addEventListener('click', function () {
+      if (!recognition) return;
+      if (listening) {
+        try { recognition.stop(); } catch (e) { /* ignore */ }
+        return;
+      }
+      try { recognition.start(); } catch (e) { /* 已在執行中 */ }
+    });
+  }
+
+  /* ============================================================
+     9. 事件綁定與初始化
+     ============================================================ */
+
+  function selectTopic(topic) {
+    var chips = document.querySelectorAll('.topic-chip');
+    for (var i = 0; i < chips.length; i++) {
+      var on = chips[i].getAttribute('data-topic') === topic;
+      chips[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
+    store.set('topic', topic);
+    els.customWrap.classList.toggle('hidden', topic !== TOPIC_CUSTOM);
+    updateBadge();
+    if (topic === TOPIC_CUSTOM && !els.customTopic.value) els.customTopic.focus();
+  }
+
+  function restoreTopic() {
+    var t = store.get('topic');
+    if (!t) return;
+    var chips = document.querySelectorAll('.topic-chip');
+    for (var i = 0; i < chips.length; i++) {
+      if (chips[i].getAttribute('data-topic') === t) {
+        selectTopic(t);
+        return;
+      }
+    }
+  }
+
+  function bindEvents() {
+    $('settingsToggle').addEventListener('click', function () {
+      var panel = $('settingsPanel');
+      var closed = panel.classList.toggle('hidden');
+      this.setAttribute('aria-expanded', closed ? 'false' : 'true');
+    });
+
+    $('saveKeyBtn').addEventListener('click', function () {
+      var k = els.apiKey.value.trim();
+      if (!k) { toast('請先貼上 API Key。', 'err'); return; }
+      if (k.indexOf('gsk_') !== 0) {
+        toast('看起來不像 Groq 的 Key（應該以 gsk_ 開頭），請確認後再試。', 'err');
+        return;
+      }
+      store.set('key', k);
+      els.apiKey.value = k;
+      setKeyStatus('✅ 已儲存 API Key（留在這台電腦）');
+      toast('儲存成功！', 'ok');
+    });
+
+    $('clearKeyBtn').addEventListener('click', function () {
+      store.del('key');
+      els.apiKey.value = '';
+      setKeyStatus('已清除，請記得關掉這個分頁。');
+      toast('API Key 已從這台電腦清除。', 'ok');
+    });
+
+    els.model.addEventListener('change', function () {
+      var v = els.model.value.trim();
+      if (v) { store.set('model', v); toast('模型已切換為 ' + v, 'ok'); }
+    });
+
+    $('topicChips').addEventListener('click', function (ev) {
+      var btn = ev.target.closest ? ev.target.closest('.topic-chip') : null;
+      if (!btn) return;
+      selectTopic(btn.getAttribute('data-topic'));
+    });
+
+    els.customTopic.addEventListener('input', function () {
+      store.set('customTopic', els.customTopic.value.trim());
+      updateBadge();
+    });
+
+    els.rawText.addEventListener('input', function () {
+      updateCount();
+      store.set('draft', els.rawText.value);
+    });
+
+    $('clearBtn').addEventListener('click', function () {
+      if (!els.rawText.value.trim()) { toast('這裡本來就是空的。', 'info'); return; }
+      if (!window.confirm('要清除輸入框裡的內容嗎？')) return;
+      els.rawText.value = '';
+      updateCount();
+      store.del('draft');
+      toast('已清除，可以重新說一次！', 'ok');
+    });
+
+    $('toNode1Btn').addEventListener('click', runNode1);
+    $('toNode23Btn').addEventListener('click', runNode23);
+
+    $('regenQuestionsBtn').addEventListener('click', function () {
+      if (!window.confirm('要請導師換兩個問題嗎？\n（你剛才寫的回答會被清掉）')) return;
+      store.del('a-q1');
+      store.del('a-q2');
+      runNode1();
+    });
+
+    $('backToStep1Btn').addEventListener('click', function () { showStep(1); });
+    $('backToStep2Btn').addEventListener('click', function () { showStep(2); });
+
+    $('copyArticleBtn').addEventListener('click', function () {
+      var text = $('finalDraft').textContent;
+      if (!text) { toast('還沒有文章可以複製。', 'err'); return; }
+      var done = function () { toast('文章已複製到剪貼簿！', 'ok'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
+
+    $('printBtn').addEventListener('click', function () { window.print(); });
+
+    $('restartBtn').addEventListener('click', function () {
+      if (!window.confirm('確定要重新開始嗎？\n（剛才的內容會被清空，這個動作不能復原）')) return;
+      restart();
+    });
+
+    $('cancelBtn').addEventListener('click', function () {
+      if (activeController) {
+        userAborted = true;
+        try { activeController.abort(); } catch (e) { /* ignore */ }
+      }
+    });
+  }
+
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      var ok = document.execCommand('copy');
+      if (ok) done(); else toast('複製失敗，請手動選取文章文字。', 'err');
+    } catch (e) {
+      toast('這個瀏覽器不允許自動複製，請手動選取文章文字。', 'err');
+    }
+    document.body.removeChild(ta);
+  }
+
+  function restart() {
+    store.clearDraft();
+    els.rawText.value = '';
+    els.customTopic.value = '';
+    updateCount();
+    updateBadge();
+    var chips = document.querySelectorAll('.topic-chip');
+    for (var i = 0; i < chips.length; i++) chips[i].setAttribute('aria-pressed', 'false');
+    els.customWrap.classList.add('hidden');
+    clearError('step1Error');
+    clearError('step2Error');
+    clearError('step3Error');
+    $('questionsContainer').textContent = '';
+    $('node1Praise').textContent = '';
+    $('finalDraft').textContent = '';
+    $('wordCountNote').textContent = '';
+    setKeyStatus();
+    showStep(1);
+    toast('準備好開始新的一篇了！', 'ok');
+  }
+
+  function init() {
+    els = {
+      apiKey: $('apiKey'),
+      model: $('modelInput'),
+      rawText: $('rawText'),
+      customTopic: $('customTopic'),
+      customWrap: $('customTopicWrap'),
+      badge: $('topicBadge'),
+      charCount: $('charCount'),
+      mic: $('micBtn')
+    };
+
+    var savedKey = store.get('key');
+    if (savedKey) els.apiKey.value = savedKey;
+    setKeyStatus();
+
+    els.model.value = store.get('model') || CONFIG.model;
+
+    var draft = store.get('draft');
+    if (draft) {
+      if (window.confirm('要接著寫上次沒寫完的內容嗎？\n（按「取消」就從空白開始）')) {
+        els.rawText.value = draft;
+        toast('已幫你接回上次的內容。', 'ok');
+      } else {
+        store.del('draft');
+      }
+    }
+    els.customTopic.value = store.get('customTopic') || '';
+    restoreTopic();
+    updateCount();
+    updateBadge();
+    setupSpeech();
+    bindEvents();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
