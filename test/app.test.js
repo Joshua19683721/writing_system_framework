@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const DIR = path.join(__dirname, '..');
@@ -54,7 +54,7 @@ class El {
     if (this.classList.contains(cls)) return this;
     return this.parentNode && this.parentNode.closest ? this.parentNode.closest(sel) : null;
   }
-  get textContent() { return this.children.length ? this.children.map(c => c.textContent).join('') : this._text; }
+  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
   set textContent(v) { this._text = String(v); this.children.length = 0; }
 }
 const HTML = fs.readFileSync(path.join(DIR, 'index.html'), 'utf8');
@@ -380,6 +380,78 @@ async function boot(responses, keyValue) {
     const r = await boot([], 'gsk_k');
     ok('\u9ea5\u514b\u98a8\u6309\u9215\u96b1\u85cf', r.env.get('micBtn').classList.contains('hidden'));
     ok('\u986f\u793a\u66ff\u4ee3\u63d0\u793a', r.env.get('speechUnsupported').classList.contains('hidden') === false);
+  }
+  console.log('\n== 13. 簡體 → 繁體 轉換（逐字）==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({
+        praise: '你把比赛寫得很好！学习很专注。',
+        questions: [
+          { id: 'q1', question_text: '当时听到什么声音？', placeholder: '例如听到球鞋摩擦地板' },
+          { id: 'q2', question_text: '为什么后来改变想法？', placeholder: '例如因为队长说了一句' }
+        ]
+      })) },
+      { status: 200, body: groqBody(JSON.stringify({
+        keeps: ['【感情真实】写得很清楚！', '【细节生动】补充了声音。'],
+        changes: ['词汇微调：建议改用情绪化的句子。', '词辞调整：请使用繁体中文。'],
+        final_article: '我们学习这个词，老师说要专注。这是我们的学习记录，许多人认为牢记最重要。'
+      })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '我们学校比赛得了冠军。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    const praise = env.get('node1Praise').textContent;
+    const qText = env.get('questionsContainer').children[0].children[0].textContent;
+    const qPh = env.get('q1').placeholder;
+    ok('praise：比赛→比賽', praise.indexOf('比賽') !== -1, praise);
+    ok('praise：学习→學習', praise.indexOf('學習') !== -1, praise);
+    ok('praise：专注→專注', praise.indexOf('專注') !== -1, praise);
+    ok('praise 不含簡體字', praise.indexOf('比赛') === -1 && praise.indexOf('学习') === -1 && praise.indexOf('专注') === -1, praise);
+    ok('問題：当时听到→當時聽到', qText.indexOf('當時聽到什麼聲音') !== -1, qText);
+    ok('問題不含簡體字', qText.indexOf('当时听到') === -1, qText);
+    ok('placeholder：听到→聽到', qPh.indexOf('聽到') !== -1, qPh);
+    ok('placeholder 不含簡體字', qPh.indexOf('听到') === -1, qPh);
+    env.get('q1').value = '聽到球鞋聲。';
+    env.get('q2').value = '因為隊長說。';
+    env.get('toNode23Btn').fire('click');
+    try {
+      await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    } catch (e) { console.log(diag(env, r.calls)); throw e; }
+    const art = env.get('finalDraft').textContent;
+    const keep0 = env.get('keepList').children[0].textContent;
+    const chg1 = env.get('changeList').children[1].textContent;
+    ok('Keep：真实→真實', keep0.indexOf('真實') !== -1, keep0);
+    ok('Change：词辞调整→詞辭調整', chg1.indexOf('詞辭調整') !== -1, chg1);
+    ok('文章：学习/记录/认为/牢记 全轉繁體',
+      art.indexOf('我們學習') !== -1 && art.indexOf('學習記錄') !== -1 && art.indexOf('認為牢記') !== -1, art);
+    ok('文章不含簡體字', art.indexOf('我们学习') === -1 && art.indexOf('学习记录') === -1 && art.indexOf('认为牢记') === -1, art);
+    ok('全文字數仍能計算', env.get('wordCountNote').textContent.indexOf('全文約') !== -1);
+  }
+  console.log('\n== 14. 台灣慣用詞替換 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({
+        praise: '你遇到软件问题的时候，结果用用户账号了。',
+        questions: [{ question_text: '你无法输入经过证书的写法是什么？' }, { question_text: '这份数据的质量如何？' }]
+      })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '软件会安装在电脑上。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    const p = env.get('node1Praise').textContent;
+    const q1t = env.get('questionsContainer').children[0].children[0].textContent;
+    const q2t = env.get('questionsContainer').children[1].children[0].textContent;
+    ok('软件→軟體', p.indexOf('軟體') !== -1, p);
+    ok('用户→使用者', p.indexOf('使用者') !== -1, p);
+    ok('账号→帳號', p.indexOf('帳號') !== -1, p);
+    ok('軟體/使用者 不殘留簡體', p.indexOf('软件') === -1 && p.indexOf('用户') === -1 && p.indexOf('账号') === -1, p);
+    ok('证书→證書', q1t.indexOf('證書') !== -1, q1t);
+    ok('写法→寫法', q1t.indexOf('寫法') !== -1, q1t);
+    ok('数据→資料', q2t.indexOf('資料') !== -1, q2t);
+    ok('质量→品質', q2t.indexOf('品質') !== -1, q2t);
+    ok('資料/品質 不殘留簡體', q2t.indexOf('数据') === -1 && q2t.indexOf('质量') === -1, q2t);
   }
   console.log('\n== 12. HTML \u2194 JS \u95dc\u806f\u9759\u614e\u6aa2\u67e5 ==');
   {
