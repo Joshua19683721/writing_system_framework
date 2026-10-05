@@ -228,6 +228,8 @@
     '3. 文章重構成型 (Draft)：',
     '   - 將內容整理為「國中會考架構格式」（段落分明、起承轉合）。',
     '   - 保留孩子原本的意思與口吻，僅修飾語病與強化細節。',
+    '   - 語意必須通順正確：句子要自然、因果要成立、前後不可矛盾、人稱一致、不得有語意跳接。',
+    '   - 輸出前請自行先檢查一遍，確認沒有錯別字、不成句與語意不通的段落。',
     '',
     '【語言與格式規範】：',
     '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
@@ -249,27 +251,36 @@
   ].join('\n');
 
   var PROMPT_PROOFREAD = [
-    '你是一位嚴格的國文老師，專門為國小學生做錯別字與詞彙誤用的校對。請檢查下方文章，找出所有錯誤並直接修正。',
+    '你是一位嚴格的國文老師。請對下方文章做**完整複核**：檢查所有錯誤，**直接修正**，並確認修正後的語意通順正確。',
     '',
-    '【檢查重點】：',
-    '1. 錯別字與同音字誤用（在見→再見、以經→已經、決對→絕對、既使→即使）。',
+    '【第一類：字詞錯誤】',
+    '1. 錯別字與同音字（在見→再見、以經→已經、決對→絕對、既使→即使）。',
     '2. 的／地／得 誤用（的接名詞、地接動作、得接補語）。',
     '3. 成語誤寫（迫不急待→迫不及待、一如繼往→一如既往、名符其實→名副其實）。',
     '4. 台灣慣用詞（計劃→計畫、水平→水準、影片、軟體、資料）。',
-    '5. 標點符號：「」『』、，、。、…… 的正確使用，以及標點是否貼在句末。',
-    '6. 重複字詞、語序不通順之處。',
+    '5. 標點符號：「」『』、，、。、…… 是否正確，標點是否貼在句末。',
     '',
-    '【重要原則】：',
-    '1. 只修正錯誤，不要改寫內容、不要更換用詞風格、不要增加或刪減句子。',
-    '2. 保留孩子原本的語氣與用字習慣，只把錯的地方改對。',
-    '3. 保留原本的段落分行（用換行分隔，不要加標題或編號）。',
-    '4. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
-    '5. 如果文章沒有任何錯誤，corrections 回傳空陣列，corrected_article 原樣輸出。',
+    '【第二類：語意與邏輯】',
+    '6. 句子是否通順自然，有無語意跳接、詞不達意或不成句的地方。',
+    '7. 段落之間是否連貫，前後因果關係是否合理（因為…所以…是否成立）。',
+    '8. 前後敘述是否矛盾（例如先說輸了、後面又說贏了卻沒交代原因）。',
+    '9. 人稱是否一致（第一人稱我／我們不可混用錯誤）。',
+    '10. 時間與時序是否合理（先後順序是否顛倒）。',
+    '11. 重複字詞贅述、語序不順、缺主語或缺動詞造成的語意殘缺。',
+    '',
+    '【修正原則】：',
+    '1. 錯誤一定要修到正確為止，**不得留下任何錯別字與語意不通之處**。',
+    '2. 語意不通時，**可以調整語序與用詞**讓句子讀起來自然正確。',
+    '3. 但絕對不可增加與原稿無關的新事件、新人物，或大幅改寫成另一篇文章。',
+    '4. 保留孩子原本的語氣與用字習慣，修正幅度要最小。',
+    '5. 保留原本的段落分行（用換行分隔，不要加標題或編號）。',
+    '6. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
+    '7. 若確實沒有任何錯誤，corrections 回傳空陣列，corrected_article 原樣輸出。',
     '',
     '【輸出 JSON 格式】：',
     '{',
-    '  "corrections": ["原寫「再見」誤作「在見」，已改為「再見」。", "成語「迫不急待」應為「迫不及待」，已修正。"],',
-    '  "corrected_article": "修正後的完整文章，段落以換行分隔..."',
+    '  "corrections": ["✏️「再見」誤作「在見」，已改為「再見」。", "🔗 語意：前半段說輸了、後半段說贏了卻沒有交代轉折，已補上因為…所以…的因果。"],',
+    '  "corrected_article": "複核修正後的完整文章，段落以換行分隔..."',
     '}',
     '',
     '【輸出規則】只輸出合法 JSON，不要加任何解釋文字或 Markdown 符號。'
@@ -900,19 +911,35 @@
     };
   }
 
-  // LLM 深度校對：不擋住畫面，失敗時保留字典修正的結果
+  function countParas(t) {
+    return t.split(/\n+/).filter(function (s) { return s.trim(); }).length;
+  }
+
+  // 守門：模型若把文章「改寫」而不是「修正」，就拒絕套用，保留原版
+  function looksLikeRewrite(original, corrected) {
+    if (!corrected || !corrected.trim()) return true;
+    var a = original.replace(/\s+/g, '');
+    var b = corrected.replace(/\s+/g, '');
+    if (!a.length || !b.length) return true;
+    if (Math.abs(b.length - a.length) / a.length > 0.25) return true;
+    if (countParas(original) !== countParas(corrected)) return true;
+    return false;
+  }
+
+  // 國文老師深度複核：不擋住畫面，失敗或越權改寫時保留字典修正的結果
   function runProofread(article, localFixes) {
     renderProofread(localFixes.map(function (f) { return '✏️ ' + f; }),
-      '✅ 已用內建字典立即修正以上 ' + localFixes.length + ' 處，國文老師正在做深度校對…');
+      '✅ 已用內建字典立即修正以上 ' + localFixes.length + ' 處，國文老師正在複核字詞與語意…');
     setProofBadge(localFixes.length);
     renderArticle(article);
 
-    var user = ['【待檢查文章】', article].join('\n');
+    var user = ['【待複核文章】', article].join('\n');
     return callGroq(PROMPT_PROOFREAD, user).then(function (raw) {
       var res = normalizeProofread(extractJson(raw));
       var fixed = res.corrected_article || article;
+      var rejected = looksLikeRewrite(article, fixed);
       var extra = [];
-      var finalText = fixTypos(fixed, extra);
+      var finalText = rejected ? article : fixTypos(fixed, extra);
       if (finalText !== article) renderArticle(finalText);
 
       var items = localFixes.map(function (f) { return '✏️ ' + f; });
@@ -920,11 +947,17 @@
       extra.forEach(function (f) { items.push('✏️ ' + f); });
       var total = items.length;
       setProofBadge(total);
-      renderProofread(items, total === 0
-        ? '✅ 國文老師檢核完畢，文章沒有任何錯別字，非常棒！'
-        : '✅ 國文老師檢核完畢，已全部修正，共 ' + total + ' 處。');
+
+      if (rejected) {
+        renderProofread(items,
+          '⚠️ 國文老師這次的修改幅度過大，看起來不像校對而是改寫，為了保護你的原文，已保留修正前的版本。');
+      } else {
+        renderProofread(items, total === 0
+          ? '✅ 國文老師複核完畢：沒有錯別字，語意也通順正確，非常棒！'
+          : '✅ 國文老師複核完畢：錯別字與語意問題都已修正，共 ' + total + ' 處。');
+      }
     }).catch(function (e) {
-      var msg = (isAppError(e) && e.message) ? e.message : '深度校對暫時無法完成';
+      var msg = (isAppError(e) && e.message) ? e.message : '深度複核暫時無法完成';
       $('proofreadNote').textContent = '⚠️ ' + msg
         + (localFixes.length ? '（內建字典的 ' + localFixes.length + ' 處修正已套用）' : '');
     });

@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const DIR = path.join(__dirname, '..');
@@ -508,13 +508,13 @@ async function boot(responses, keyValue) {
     await waitFor(() => env.get('step2').classList.contains('hidden') === false);
     env.get('toNode23Btn').fire('click');
     await waitFor(() => env.get('step3').classList.contains('hidden') === false);
-    await waitFor(() => env.get('proofreadNote').textContent.indexOf('檢核完畢') !== -1, 8000);
+    await waitFor(() => env.get('proofreadNote').textContent.indexOf('複核完畢') !== -1, 8000);
     const art = env.get('finalDraft').textContent;
     ok('LLM 修正後的文章已更新', art.indexOf('仔細地看著') !== -1, art);
     ok('原錯誤已消失', art.indexOf('仔細的看') === -1, art);
     eq('檢核清單 2 項', env.get('proofreadList').children.length, 2);
     ok('清單含「地」的說明', env.get('proofreadList').children[0].textContent.indexOf('地') !== -1);
-    ok('完成訊息正確', env.get('proofreadNote').textContent.indexOf('檢核完畢') !== -1);
+    ok('完成訊息正確', env.get('proofreadNote').textContent.indexOf('複核完畢') !== -1);
     ok('總修正數 = 2', env.get('proofBadge').textContent.indexOf('2 處') !== -1, env.get('proofBadge').textContent);
     const req = JSON.parse(r.calls[2].opts.body);
     ok('第 3 次請求使用檢字 Prompt', req.messages[0].content.indexOf('錯別字') !== -1);
@@ -537,6 +537,87 @@ async function boot(responses, keyValue) {
     ok('文章仍保留字典修正', env.get('finalDraft').textContent.indexOf('迫不及待') !== -1, env.get('finalDraft').textContent);
     ok('顯示失敗但不崩潰', env.get('proofreadNote').textContent.indexOf('內建字典') !== -1, env.get('proofreadNote').textContent);
     ok('仍停留在 Step3', env.get('step3').classList.contains('hidden') === false);
+  }
+  console.log('\n== 18. 複核：語意與邏輯已納入 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody('{"keeps":[],"changes":[],"final_article":"原本的文章內容。"}') },
+      { status: 200, body: groqBody('{"corrections":[],"corrected_article":""}') }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '測試語意檢查。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    await waitFor(() => env.get('proofreadNote').textContent.indexOf('複核完畢') !== -1, 8000);
+    const p = JSON.parse(r.calls[2].opts.body);
+    const sys = p.messages[0].content;
+    ok('含「語意與邏輯」區塊', sys.indexOf('語意與邏輯') !== -1);
+    ok('要求檢查語意跳接', sys.indexOf('語意跳接') !== -1);
+    ok('要求檢查前後矛盾', sys.indexOf('前後敘述是否矛盾') !== -1);
+    ok('要求檢查人稱一致', sys.indexOf('人稱是否一致') !== -1);
+    ok('要求檢查時序', sys.indexOf('時序') !== -1);
+    ok('允許調整語序', sys.indexOf('可以調整語序') !== -1);
+    ok('仍禁止新增無關事件', sys.indexOf('不可增加與原稿無關的新事件') !== -1);
+    ok('要求不得留下錯別字', sys.indexOf('不得留下任何錯別字') !== -1);
+    ok('user 帶入待複核文章', p.messages[1].content.indexOf('待複核文章') !== -1);
+  }
+  console.log('\n== 19. 守門：拒絕整篇改寫 ==');
+  {
+    const original = '第一段原本的內容在這裡。\n\n第二段原本的內容也在這裡。';
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody(JSON.stringify({ keeps: [], changes: [], final_article: original })) },
+      { status: 200, body: groqBody(JSON.stringify({
+        corrections: ['模型把整篇文章改寫了。'],
+        corrected_article: '這是一篇完全不同的新文章，內容被整個替換掉了，長度也差很多很多很多。'
+      })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '測試守門機制。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    await waitFor(() => env.get('proofreadNote').textContent.indexOf('改寫') !== -1, 8000);
+    ok('拒絕套用改寫後文章', env.get('finalDraft').textContent === original, env.get('finalDraft').textContent);
+    ok('提示已保留原文', env.get('proofreadNote').textContent.indexOf('保留修正前的版本') !== -1, env.get('proofreadNote').textContent);
+    ok('仍顯示修正說明', env.get('proofreadList').children.length >= 1);
+  }
+  console.log('\n== 20. 守門：段落數改變也拒絕 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody(JSON.stringify({ keeps: [], changes: [], final_article: '原本只有一段文章在這裡，內容長度剛好。' })) },
+      { status: 200, body: groqBody(JSON.stringify({ corrections: ['合併成三段。'], corrected_article: '第一段。\n\n第二段。\n\n第三段。' })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '測試段落守門。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    await waitFor(() => env.get('proofreadNote').textContent.indexOf('改寫') !== -1, 8000);
+    ok('段落數改變時拒絕套用', env.get('finalDraft').textContent.indexOf('第三段') === -1, env.get('finalDraft').textContent);
+  }
+  console.log('\n== 21. 守門：同段小幅修正允許 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody(JSON.stringify({ keeps: [], changes: [], final_article: '我仔細的看著球場。' })) },
+      { status: 200, body: groqBody(JSON.stringify({ corrections: ['「的」改「地」。'], corrected_article: '我仔細地看著球場。' })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '測試正常修正。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    await waitFor(() => env.get('proofreadNote').textContent.indexOf('複核完畢') !== -1, 8000);
+    ok('小幅修正正常套用', env.get('finalDraft').textContent === '我仔細地看著球場。', env.get('finalDraft').textContent);
+    ok('未觸發改寫警告', env.get('proofreadNote').textContent.indexOf('改寫') === -1);
   }
   console.log('\n== 12. HTML \u2194 JS \u95dc\u806f\u9759\u614e\u6aa2\u67e5 ==');
   {
