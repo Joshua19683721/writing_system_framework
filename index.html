@@ -141,9 +141,17 @@
         </div>
       </div>
       <div class="bg-indigo-50 border-2 border-indigo-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
-        <h3 class="text-lg sm:text-xl font-black text-indigo-900">📝 幫你整理好的會考架構文章</h3>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="text-lg sm:text-xl font-black text-indigo-900">📝 幫你整理好的會考架構文章</h3>
+          <span id="proofBadge" class="hidden text-sm font-black bg-emerald-100 text-emerald-800 border-2 border-emerald-200 px-3 py-1 rounded-full"></span>
+        </div>
         <div id="finalDraft" class="writing bg-white border border-indigo-100 rounded-2xl p-5 text-lg text-slate-800 whitespace-pre-wrap"></div>
         <p id="wordCountNote" class="text-sm font-bold text-slate-500"></p>
+      </div>
+      <div id="proofreadCard" class="hidden bg-amber-50 border-2 border-amber-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
+        <h3 class="text-lg sm:text-xl font-black text-amber-900">🔍 錯別字檢核結果</h3>
+        <ul id="proofreadList" class="list-disc list-inside text-slate-700 space-y-1.5 font-medium leading-relaxed"></ul>
+        <p id="proofreadNote" class="text-sm font-bold text-slate-500"></p>
       </div>
     </div>
     <div class="no-print space-y-3">
@@ -240,6 +248,33 @@
     '}'
   ].join('\n');
 
+  var PROMPT_PROOFREAD = [
+    '你是一位嚴格的國文老師，專門為國小學生做錯別字與詞彙誤用的校對。請檢查下方文章，找出所有錯誤並直接修正。',
+    '',
+    '【檢查重點】：',
+    '1. 錯別字與同音字誤用（在見→再見、以經→已經、決對→絕對、既使→即使）。',
+    '2. 的／地／得 誤用（的接名詞、地接動作、得接補語）。',
+    '3. 成語誤寫（迫不急待→迫不及待、一如繼往→一如既往、名符其實→名副其實）。',
+    '4. 台灣慣用詞（計劃→計畫、水平→水準、影片、軟體、資料）。',
+    '5. 標點符號：「」『』、，、。、…… 的正確使用，以及標點是否貼在句末。',
+    '6. 重複字詞、語序不通順之處。',
+    '',
+    '【重要原則】：',
+    '1. 只修正錯誤，不要改寫內容、不要更換用詞風格、不要增加或刪減句子。',
+    '2. 保留孩子原本的語氣與用字習慣，只把錯的地方改對。',
+    '3. 保留原本的段落分行（用換行分隔，不要加標題或編號）。',
+    '4. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
+    '5. 如果文章沒有任何錯誤，corrections 回傳空陣列，corrected_article 原樣輸出。',
+    '',
+    '【輸出 JSON 格式】：',
+    '{',
+    '  "corrections": ["原寫「再見」誤作「在見」，已改為「再見」。", "成語「迫不急待」應為「迫不及待」，已修正。"],',
+    '  "corrected_article": "修正後的完整文章，段落以換行分隔..."',
+    '}',
+    '',
+    '【輸出規則】只輸出合法 JSON，不要加任何解釋文字或 Markdown 符號。'
+  ].join('\n');
+
   /* ============================================================
      2. 設定
      ============================================================ */
@@ -324,6 +359,43 @@
     return s.replace(/[\u3400-\u9fff\uf900-\ufaff]/g, function (c) {
       return S2T_MAP[c] || c;
     });
+  }
+
+  /* ============================================================
+     3.6 錯別字／詞彙誤用修正（內建字典，即時生效）
+
+     模型偶爾會寫錯字，LLM 深度檢校需要等待；
+     這一層在拿到文章後立刻套用，零延遲。
+     ============================================================ */
+
+  var TYPO_PAIRS = '迫不急待=迫不及待;迫不急切=迫不及待;一如繼往=一如既往;一如即往=一如既往;一如继往=一如既往;再接再厲=再接再勵;在接再厲=再接再勵;在接再励=再接再勵;名符其實=名副其實;名符其实=名副其實;走頭無路=走投無路;不知所錯=不知所措;按耐不住=按捺不住;按奈不住=按捺不住;一諾千斤=一諾千金;一愁莫展=一籌莫展;按步就班=按部就班;全神貫註=全神貫注;脱胎换骨=脫胎換骨;既使=即使;既使如此=即使如此;決對=絕對;絶對=絕對;起負=起伏;此起彼複=此起彼伏;坐位=座位;坐位上=座位上;座落=坐落;一但=一旦;一但發生=一旦發生;尽管=儘管;儘量=盡量;尽量=盡量;盡量多=儘量多;为了=為了;为了了=為了;由于=由於;其实=其實;和霭=和藹;和靄可親=和藹可親;一副畫布=一幅畫布;一副對聯=一幅對聯;潮溼=潮濕;計劃=計畫;计画=計畫;水准=水準;水平線=水準線;賬號=帳號;帐號=帳號;賬戶=帳戶;聯係=聯絡;連系=聯絡;布告欄=佈告欄;圖象=圖像;其它=其他;其它人=其他人;重覆=重複;重复=重複;显然=顯然;欣赏=欣賞;结束=結束;臺灣=台灣;裏面=裡面;里面=裡面;那麽=那麼;怎麽=怎麼;时常=時常;偶而=偶爾;偶尔=偶爾;冷静=冷靜;准备=準備;体會=體會;观察=觀察;发现=發現;鼓励=鼓勵;温暖=溫暖;扩大=擴大;进步=進步;通过=通過;阳光=陽光;灿烂=燦爛';
+
+  var TYPO_MAP = (function () {
+    var map = {};
+    var parts = TYPO_PAIRS.split(';');
+    for (var i = 0; i < parts.length; i++) {
+      var kv = parts[i].split('=');
+      if (kv.length === 2 && kv[0]) map[kv[0]] = kv[1];
+    }
+    return map;
+  })();
+
+  var TYPO_KEYS = Object.keys(TYPO_MAP).sort(function (a, b) { return b.length - a.length; });
+
+  // 修正字串或字串陣列，並把改動記到 fixes 清單
+  function fixTypos(value, fixes) {
+    if (typeof value !== 'string' || !value) return value;
+    var out = value;
+    for (var i = 0; i < TYPO_KEYS.length; i++) {
+      var w = TYPO_KEYS[i];
+      if (out.indexOf(w) === -1) continue;
+      var n = out.split(w).length - 1;
+      out = out.split(w).join(TYPO_MAP[w]);
+      if (fixes && fixes.indexOf(w + ' → ' + TYPO_MAP[w]) === -1) {
+        fixes.push(w + ' → ' + TYPO_MAP[w] + (n > 1 ? '（' + n + ' 處）' : ''));
+      }
+    }
+    return out;
   }
 
   var store = {
@@ -786,23 +858,91 @@
       q2 || '（孩子還沒回答，請勿臆造孩子的回答，但可依口述內容補充合理細節）'
     ].join('\n');
 
+  /* ============================================================
+     7.5 錯別字檢核：即時字典修正 + LLM 深度校對
+     ============================================================ */
+
+  function renderArticle(article) {
+    $('finalDraft').textContent = article;
+    var n = article.replace(/\s+/g, '').length;
+    $('wordCountNote').textContent = '全文約 ' + n + ' 字'
+      + (n >= 400 && n <= 600
+        ? ' ✅ 剛好落在會考建議的 400～600 字之間！'
+        : '（國中會考作文建議 400～600 字，可以再想想要不要補充細節喔）');
+    var t = currentTopic();
+    $('printMeta').textContent = (t ? '練習主題：' + t : '自由練習')
+      + '　｜　' + new Date().toLocaleDateString('zh-TW');
+  }
+
+  function renderProofread(items, note) {
+    $('proofreadCard').classList.remove('hidden');
+    fillList($('proofreadList'), items, '（沒有發現任何錯別字，文章寫得很乾淨！）');
+    $('proofreadNote').textContent = note || '';
+  }
+
+  function setProofBadge(total) {
+    var b = $('proofBadge');
+    if (total > 0) {
+      b.textContent = '✅ 已修正 ' + total + ' 處錯別字';
+      b.classList.remove('hidden');
+    } else {
+      b.classList.add('hidden');
+    }
+  }
+
+  function normalizeProofread(data) {
+    if (!data || typeof data !== 'object') {
+      throw AppError('檢核結果讀不懂，請再試一次。', 'bad-shape', true);
+    }
+    return {
+      corrections: toTextList(data.corrections != null ? data.corrections : data.fixes),
+      corrected_article: firstString(data.corrected_article, data.correctedArticle, data.article)
+    };
+  }
+
+  // LLM 深度校對：不擋住畫面，失敗時保留字典修正的結果
+  function runProofread(article, localFixes) {
+    renderProofread(localFixes.map(function (f) { return '✏️ ' + f; }),
+      '✅ 已用內建字典立即修正以上 ' + localFixes.length + ' 處，國文老師正在做深度校對…');
+    setProofBadge(localFixes.length);
+    renderArticle(article);
+
+    var user = ['【待檢查文章】', article].join('\n');
+    return callGroq(PROMPT_PROOFREAD, user).then(function (raw) {
+      var res = normalizeProofread(extractJson(raw));
+      var fixed = res.corrected_article || article;
+      var extra = [];
+      var finalText = fixTypos(fixed, extra);
+      if (finalText !== article) renderArticle(finalText);
+
+      var items = localFixes.map(function (f) { return '✏️ ' + f; });
+      items = items.concat(res.corrections);
+      extra.forEach(function (f) { items.push('✏️ ' + f); });
+      var total = items.length;
+      setProofBadge(total);
+      renderProofread(items, total === 0
+        ? '✅ 國文老師檢核完畢，文章沒有任何錯別字，非常棒！'
+        : '✅ 國文老師檢核完畢，已全部修正，共 ' + total + ' 處。');
+    }).catch(function (e) {
+      var msg = (isAppError(e) && e.message) ? e.message : '深度校對暫時無法完成';
+      $('proofreadNote').textContent = '⚠️ ' + msg
+        + (localFixes.length ? '（內建字典的 ' + localFixes.length + ' 處修正已套用）' : '');
+    });
+  }
+
     return callGroq(PROMPT_NODE23, userContent).then(function (raw) {
       var result = normalizeNode23(extractJson(raw));
-      fillList($('keepList'), result.keeps, '（這次導師沒有特別建議，代表你寫得很完整！）');
-      fillList($('changeList'), result.changes, '（沒有發現需要修改的地方，非常棒！）');
-      $('finalDraft').textContent = result.final_article;
-
-      var n = result.final_article.replace(/\s+/g, '').length;
-      $('wordCountNote').textContent = '全文約 ' + n + ' 字'
-        + (n >= 400 && n <= 600
-          ? ' ✅ 剛好落在會考建議的 400～600 字之間！'
-          : '（國中會考作文建議 400～600 字，可以再想想要不要補充細節喔）');
-
-      var t = currentTopic();
-      $('printMeta').textContent = (t ? '練習主題：' + t : '自由練習')
-        + '　｜　' + new Date().toLocaleDateString('zh-TW');
-
+      var localFixes = [];
+      var keeps = fixTypos(result.keeps, localFixes);
+      var changes = fixTypos(result.changes, localFixes);
+      var article = fixTypos(result.final_article, localFixes);
+      fillList($('keepList'), keeps, '（這次導師沒有特別建議，代表你寫得很完整！）');
+      fillList($('changeList'), changes, '（沒有發現需要修改的地方，非常棒！）');
+      renderArticle(article);
       showStep(3);
+      hideLoading();
+      clearError('step3Error');
+      return runProofread(article, localFixes);
     }).catch(function (e) {
       handleError(e, 'step2Error', runNode23);
     }).finally(function () {

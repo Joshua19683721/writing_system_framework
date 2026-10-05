@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const DIR = path.join(__dirname, '..');
@@ -186,7 +186,8 @@ async function boot(responses, keyValue) {
         keeps: ['\u3010\u611f\u60c5\u771f\u5be6\u3011\u9006\u8f49\u5f88\u6e05\u6959\uff01', '\u3010\u7d30\u984c\u751f\u52d5\u3011\u807d\u97f3\u5f88\u7dca\u5bc6\u3002'],
         changes: ['\u26a0\ufe0f \u8a5e\u5f59\u5fae\u8abf\uff1a\u300c\u7f8e\u4e0d\u52dd\u6536\u300d\u6539\u70ba\u300c\u5fc3\u88e1\u9ad8\u8208\u5f97\u8df3\u8d77\u4f86\u300d\u3002'],
         final_article: ARTICLE
-      })) }
+      })) },
+      { status: 200, body: groqBody('{"corrections":[],"corrected_article":""}') }
     ], 'gsk_testkey');
     const env = r.env;
     env.get('rawText').value = '\u6211\u5011\u6253\u7bee\u7403\u672c\u4f86\u8f38\u4e09\u7403\uff0c\u5f8c\u4f86\u52dd\u4e86\u3002';
@@ -221,7 +222,7 @@ async function boot(responses, keyValue) {
     eq('\u6587\u7ae0\u6b63\u78ba', env.get('finalDraft').textContent, ARTICLE);
     ok('\u5b57\u6578\u63d0\u793a\u51fa\u73fe', env.get('wordCountNote').textContent.indexOf('\u5168\u6587\u7d04') !== -1);
     ok('\u5217\u5370 meta \u6709\u65e5\u671f', env.get('printMeta').textContent.length > 3);
-    eq('node23 \u53ea\u8b21\u4e00\u6b21\u7d50\u675f', r.calls.length, 2);
+    eq('\u5168\u7a0b 3 \u6b21\u8acb\u6c42\uff08node1+node23+\u6aa2\u5b57\uff09', r.calls.length, 3);
     const s2 = JSON.parse(r.calls[1].opts.body);
     ok('Node2/3 prompt \u5e36\u5165\u56de\u7b54', s2.messages[1].content.indexOf('\u6469\u64e6\u5730\u677f') !== -1);
     ok('Node2/3 system prompt', s2.messages[0].content.indexOf('Keep') !== -1 && s2.messages[0].content.indexOf('final_article') !== -1);
@@ -452,6 +453,90 @@ async function boot(responses, keyValue) {
     ok('数据→資料', q2t.indexOf('資料') !== -1, q2t);
     ok('质量→品質', q2t.indexOf('品質') !== -1, q2t);
     ok('資料/品質 不殘留簡體', q2t.indexOf('数据') === -1 && q2t.indexOf('质量') === -1, q2t);
+  }
+  console.log('\n== 15. 錯別字檢核（即時字典）==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody(JSON.stringify({
+        keeps: ['【感情真實】寫得很好！'],
+        changes: ['成語「迫不急待」建議改成「迫不及待」。'],
+        final_article: '我既使很想參加，比賽前一晚還是按奈不住地練習。\n\n一但想到觀眾在場、怕迫不急待，我們既使緊張得心跳加快，還是決對要拼到底。\n\n名符其實，比賽前我想的是計劃要放棄，沒想到最後拿到冠軍。'
+      })) },
+      { status: 200, body: groqBody('{"corrections":[],"corrected_article":""}') }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '我參加比賽很緊張。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    const art = env.get('finalDraft').textContent;
+    ok('迫不急待→迫不及待', art.indexOf('迫不及待') !== -1, art);
+    ok('按奈不住→按捺不住', art.indexOf('按捺不住') !== -1, art);
+    ok('既使→即使（出現 2 處）', art.indexOf('即使') !== -1, art);
+    ok('決對→絕對', art.indexOf('絕對') !== -1, art);
+    ok('名符其實→名副其實', art.indexOf('名副其實') !== -1, art);
+    ok('計劃→計畫', art.indexOf('計畫') !== -1, art);
+    ok('已無「既使」殘留', art.indexOf('既使') === -1, art);
+    ok('已無「決對」殘留', art.indexOf('決對') === -1, art);
+    ok('已無「名符其實」殘留', art.indexOf('名符其實') === -1, art);
+    ok('已無「按奈不住」殘留', art.indexOf('按奈不住') === -1, art);
+    const chg0 = env.get('changeList').children[0].textContent;
+    ok('Change 欄位也一併修正', chg0.indexOf('迫不及待') !== -1, chg0);
+    ok('檢核卡片已顯示', env.get('proofreadCard').classList.contains('hidden') === false);
+    const badge = env.get('proofBadge').textContent;
+    ok('已修正徽章出現', badge.indexOf('已修正') !== -1, badge);
+    ok('徽章不在隱藏狀態', env.get('proofBadge').classList.contains('hidden') === false);
+  }
+  console.log('\n== 16. 錯別字檢核（LLM 深度校對）==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody(JSON.stringify({
+        keeps: ['寫得清楚'], changes: ['可再加細節'],
+        final_article: '我仔細的看著終場哨聲響起的那一刻。'
+      })) },
+      { status: 200, body: groqBody(JSON.stringify({
+        corrections: ['「仔細的看」應為「仔細地看」，因為修飾動作要用「地」。', '「終場哨聲響起那一刻」句尾缺標點。'],
+        corrected_article: '我仔細地看著終場哨聲響起的那一刻。'
+      })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '比賽很精彩。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    await waitFor(() => env.get('proofreadNote').textContent.indexOf('檢核完畢') !== -1, 8000);
+    const art = env.get('finalDraft').textContent;
+    ok('LLM 修正後的文章已更新', art.indexOf('仔細地看著') !== -1, art);
+    ok('原錯誤已消失', art.indexOf('仔細的看') === -1, art);
+    eq('檢核清單 2 項', env.get('proofreadList').children.length, 2);
+    ok('清單含「地」的說明', env.get('proofreadList').children[0].textContent.indexOf('地') !== -1);
+    ok('完成訊息正確', env.get('proofreadNote').textContent.indexOf('檢核完畢') !== -1);
+    ok('總修正數 = 2', env.get('proofBadge').textContent.indexOf('2 處') !== -1, env.get('proofBadge').textContent);
+    const req = JSON.parse(r.calls[2].opts.body);
+    ok('第 3 次請求使用檢字 Prompt', req.messages[0].content.indexOf('錯別字') !== -1);
+    ok('第 3 次請求帶入文章', req.messages[1].content.indexOf('仔細的看著') !== -1);
+  }
+  console.log('\n== 17. 深度校對失敗時仍保留字典修正 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody(JSON.stringify({ keeps: [], changes: [], final_article: '我迫不急待地出發了。' })) },
+      { status: 401, body: { error: { message: 'Invalid API Key' } } }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '出發很緊張。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    await waitFor(() => env.get('proofreadNote').textContent.indexOf('⚠️') !== -1, 8000);
+    ok('文章仍保留字典修正', env.get('finalDraft').textContent.indexOf('迫不及待') !== -1, env.get('finalDraft').textContent);
+    ok('顯示失敗但不崩潰', env.get('proofreadNote').textContent.indexOf('內建字典') !== -1, env.get('proofreadNote').textContent);
+    ok('仍停留在 Step3', env.get('step3').classList.contains('hidden') === false);
   }
   console.log('\n== 12. HTML \u2194 JS \u95dc\u806f\u9759\u614e\u6aa2\u67e5 ==');
   {
