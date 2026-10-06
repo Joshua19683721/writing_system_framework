@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const DIR = path.join(__dirname, '..');
@@ -144,10 +144,11 @@ function waitFor(fn, ms) {
     })();
   });
 }
-async function boot(responses, keyValue) {
+async function boot(responses, keyValue, opts) {
   const env = makeEnv();
   const calls = [];
   const queue = responses.slice();
+  if (opts && opts.SpeechRecognition) env.ctx.window.SpeechRecognition = opts.SpeechRecognition;
   env.ctx.fetch = function (url, opts) {
     const next = queue.shift();
     const rr = next ? resp(next.status, next.body, next.raw) : resp(500, { error: { message: 'NO STUB LEFT' } });
@@ -642,6 +643,193 @@ async function boot(responses, keyValue) {
     const containers = ['step1Error','step2Error','step3Error','interim','charCount','topicBadge'];
     const noCt = containers.filter(c => !htmlIds.has(c));
     ok('\u6240\u6709\u5bb9\u5668\u90fd\u5b58\u5728\u65bc HTML', noCt.length === 0, noCt.join(','));
+  }
+  console.log('\n== 22. \u6a21\u578b\u8f38\u51fa\u6b8b\u7559\u7c21\u9ad4\u5b57\uff08\u88dc\u9f4a\u5b57\u8868\uff09==');
+  {
+    const ART_S = '\u6211\u4eec\u8001\u5e08\u8bf4\uff0c\u4ece\u6b64\u4ee5\u540e\u8981\u597d\u597d\u8bfb\u4e66\uff0c\u518c\u5b50\u4e0a\u7684\u8bb0\u5f55\u662f\u5170\u82b1\u7684\u4ebf\u4e07\u500d\u3002\u4ed6\u8f7b\u677e\u5730\u73a9\u6e38\u620f\u3002';
+    const ART_T = '我們老師說，從此以後要好好讀書，冊子上的記錄是蘭花的億萬倍。他輕鬆地玩遊戲。';
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({
+        praise: '\u8001\u5e08\u8bf4\u4f60\u4ece\u8fd9\u6b21\u6bd4\u8d5b\u91cc\u5b66\u5230\u5f88\u591a\u3002',
+        questions: [
+          { id: 'q1', question_text: '\u8001\u5e08\u5f53\u65f6\u8bf4\u4e86\u4ec0\u4e48\uff1f', placeholder: '例如他說你很努力' },
+          { id: 'q2', question_text: '\u4f60\u4ece\u4e2d\u5b66\u5230\u4e86\u4ec0\u4e48\uff1f', placeholder: '例如學會了堅持' }
+        ]
+      })) },
+      { status: 200, body: groqBody(JSON.stringify({
+        keeps: ['\u5185\u5bb9\u771f\u5b9e'],
+        changes: ['\u8bcd\u6c47\u53ef\u4ee5\u66f4\u4e30\u5bcc'],
+        final_article: ART_S
+      })) },
+      { status: 200, body: groqBody('{"corrections":[],"corrected_article":""}') }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '我參加了一場比賽。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    const praise = env.get('node1Praise').textContent;
+    ok('praise\uff1a\u8001\u5e08\u2192\u8001\u5e2b', praise.indexOf('老師') !== -1, praise);
+    ok('praise\uff1a\u4ece\u2192\u5f9e', praise.indexOf('從') !== -1, praise);
+    ok('praise\uff1a\u5b66\u2192\u5b78', praise.indexOf('學') !== -1, praise);
+    ok('praise \u5df2\u7121\u7c21\u9ad4\u6b8b\u7559',
+      praise.indexOf('\u8001\u5e08') === -1 && praise.indexOf('\u4ece') === -1 && praise.indexOf('\u5b66') === -1, praise);
+    const q1t = env.get('questionsContainer').children[0].children[0].textContent;
+    ok('\u554f\u984c\uff1a\u8001\u5e08\u2192\u8001\u5e2b', q1t.indexOf('老師') !== -1, q1t);
+    ok('\u554f\u984c\uff1a\u8bf4\u2192\u8aaa', q1t.indexOf('說') !== -1, q1t);
+    env.get('toNode23Btn').fire('click');
+    try {
+      await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    } catch (e) { console.log(diag(env, r.calls)); throw e; }
+    eq('\u6574\u7bc7\u7c21\u9ad4\u6587\u7ae0\u5168\u90e8\u8f49\u70ba\u7e41\u9ad4', env.get('finalDraft').textContent, ART_T);
+    ok('Keep\uff1a\u5185\u5bb9\u771f\u5b9e\u2192\u5167\u5bb9\u771f\u5be6', env.get('keepList').children[0].textContent.indexOf('真實') !== -1);
+    ok('Change\uff1a\u8bcd\u6c47\u2192\u8a5e\u5f59', env.get('changeList').children[0].textContent.indexOf('詞彙') !== -1);
+  }
+  console.log('\n== 23. \u6b63\u78ba\u7e41\u9ad4\u5b57\u4e0d\u5f97\u88ab\u6539\u58de\uff08\u5169\u7528\u5b57\uff09==');
+  {
+    const ART = '他表示，只有松樹下的那次出征最難忘。游泳之後，岳父帶我去買布料，順便聊到系統、考卷與台灣的天氣。早上起床時，我把秘密告訴一群正在吃粽子的同學。';
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') },
+      { status: 200, body: groqBody(JSON.stringify({ keeps: [], changes: [], final_article: ART })) },
+      { status: 200, body: groqBody('{"corrections":[],"corrected_article":""}') }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '測試兩用字。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    env.get('toNode23Btn').fire('click');
+    try {
+      await waitFor(() => env.get('step3').classList.contains('hidden') === false);
+    } catch (e) { console.log(diag(env, r.calls)); throw e; }
+    eq('\u6b63\u78ba\u7e41\u9ad4\u8a5e\u539f\u6a23\u4fdd\u7559\uff08\u8868\u793a/\u53ea\u6709/\u677e\u6a39/\u51fa\u5f81/\u6e38\u6cf3/\u5cb3\u7236/\u5e03\u6599/\u7cfb\u7d71/\u8003\u5377/\u53f0\u7063/\u8d77\u5e8a/\u79d8\u5bc6/\u4e00\u7fa4/\u7cbd\u5b50\uff09',
+      env.get('finalDraft').textContent, ART);
+  }
+  console.log('\n== 24. \u96a8\u6a5f\u4e3b\u984c\u8207\u5beb\u6cd5\u63d0\u793a ==');
+  {
+    const bankBlock = HTML.match(/var TOPIC_BANK = \[([\s\S]*?)\];/);
+    ok('index.html 有 TOPIC_BANK', !!bankBlock);
+    const entries = bankBlock[1].split('\n').map(s => s.trim()).filter(s => s.charAt(0) === "'");
+    eq('\u96a8\u6a5f\u984c\u5eab\u5171 300 \u500b\u4e3b\u984c', entries.length, 300);
+    ok('\u6bcf\u4e00\u984c\u90fd\u5e36\u300c\u958b\u982d\u2192\u4e2d\u9593\u2192\u7d50\u679c\u300d\u63d0\u793a',
+      entries.every(s => /開頭：.+中間：.+結果：/.test(s)));
+    ok('\u4e3b\u984c\u4e0d\u91cd\u8907', new Set(entries.map(s => s.split('|')[0])).size === entries.length);
+    ok('\u63d0\u793a\u90fd\u4e0d\u7a7a\u767d', entries.every(s => s.split('|')[1] && s.split('|')[1].length >= 30));
+    const bankMap = new Map(entries.map(s => {
+      const body = s.replace(/^'/, '').replace(/',?$/, '');   // 去掉外層引號與行尾逗號
+      const i = body.indexOf('|');
+      return [body.slice(0, i), body.slice(i + 1)];
+    }));
+    const HINT_PREFIX = '📝 寫法提示（開頭 → 中間 → 結果）：';
+    eq('\u984c\u5eab\u6bcf\u4e00\u984c\u90fd\u6709\u5c0d\u61c9\u63d0\u793a', bankMap.size, entries.length);
+    ok('\u984c\u5eab\u7684\u63d0\u793a\u90fd\u4e0d\u542b\u5916\u5c64\u5f15\u865f',
+      Array.from(bankMap.values()).every(v => v.indexOf("'") === -1 && v.indexOf('開頭：') === 0));
+
+    const r = await boot([], 'gsk_k');
+    const env = r.env;
+    ok('\u63d0\u793a\u5340\u4e00\u958b\u59cb\u662f\u96b1\u85cf\u7684', env.get('topicHint').classList.contains('hidden'));
+    env.get('randomTopicBtn').fire('click');
+    const topic = env.store.get('wsm.customTopic');
+    ok('\u96a8\u6a5f\u9215\u62bd\u51fa\u4e3b\u984c', !!topic && topic.length > 3, String(topic));
+    ok('\u4e3b\u984c\u5df2\u5beb\u5165\u81ea\u8a02\u4e3b\u984c\u6846', env.get('customTopic').value === topic);
+    ok('\u96a8\u6a5f\u4e3b\u984c\u6210\u70ba\u76ee\u524d\u4e3b\u984c', env.store.get('wsm.topic') === '__custom__');
+    ok('\u5fbd\u7ae0\u986f\u793a\u62bd\u5230\u7684\u4e3b\u984c', env.get('topicBadge').textContent.indexOf(topic) !== -1);
+    const hint = env.get('topicHint').textContent;
+    ok('\u8f38\u5165\u6846\u4e0a\u65b9\u51fa\u73fe\u5beb\u6cd5\u63d0\u793a', hint.indexOf('寫法提示') !== -1 && hint.indexOf('開頭：') !== -1, hint);
+    ok('\u63d0\u793a\u6db5\u84cb\u958b\u982d\u5230\u7d50\u679c', hint.indexOf('開頭') !== -1 && hint.indexOf('中間') !== -1 && hint.indexOf('結果') !== -1, hint);
+    ok('\u63d0\u793a\u5340\u5df2\u986f\u793a', env.get('topicHint').classList.contains('hidden') === false);
+    ok('\u62bd\u5230\u7684\u4e3b\u984c\u771f\u7684\u5728\u984c\u5eab\u88e1', bankMap.has(topic), String(topic));
+    ok('\u63d0\u793a\u5c31\u662f\u8a72\u4e3b\u984c\u7684\u5efa\u8b70', hint === HINT_PREFIX + bankMap.get(topic), hint);
+
+    // 連抽 40 次都必須落在題庫內，且提示跟著換
+    let allOk = true;
+    const seen = new Set();
+    for (let i = 0; i < 40; i++) {
+      env.get('randomTopicBtn').fire('click');
+      const t = env.store.get('wsm.customTopic');
+      const h = env.get('topicHint').textContent;
+      seen.add(t);
+      if (!bankMap.has(t) || h !== HINT_PREFIX + bankMap.get(t)) allOk = false;
+    }
+    ok('\u91cd\u8907\u62bd\u984c\u63d0\u793a\u90fd\u8ddf\u8457\u63db', allOk && seen.size >= 5, 'distinct topics=' + seen.size);
+    env.get('restartBtn').fire('click');
+    ok('\u91cd\u958b\u5f8c\u63d0\u793a\u6536\u8d77\u4f86', env.get('topicHint').classList.contains('hidden'));
+  }
+  console.log('\n== 25. \u6bcf\u500b\u63d0\u554f\u91cd\u9ede\u63d0\u4f9b 3\u20136 \u500b\u554f\u984c ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({
+        praise: '很棒',
+        questions: [
+          { id: 'q1', question_text: '當時你聽到什麼聲音？', placeholder: '例如球鞋摩擦地板' },
+          { id: 'q2', question_text: '為什麼後來改變戰術？', placeholder: '例如因為隊長說' }
+        ]
+      })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('rawText').value = '我參加了一場比賽。';
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    const cards = env.get('questionsContainer').children;
+    eq('\u5169\u5f35\u554f\u984c\u5361', cards.length, 2);
+    for (let i = 0; i < 2; i++) {
+      const card = cards[i];
+      const alt = card.children[card.children.length - 1];
+      const chips = alt.children[1];
+      const n = chips.children.length;
+      ok('\u554f\u984c' + (i + 1) + ' \u6709 3\u20136 \u500b\u554f\u984c\uff08\u66ff\u4ee3 ' + n + ' + \u4e3b\u984c 1\uff09', n + 1 >= 3 && n + 1 <= 6, String(n + 1));
+      ok('\u554f\u984c' + (i + 1) + ' \u66ff\u4ee3\u554f\u6cd5\u90fd\u4e0d\u7a7a\u767d',
+        Array.prototype.every.call(chips.children, c => c.textContent.length > 5));
+    }
+    const before = cards[0].children[0].textContent;
+    const chips0 = cards[0].children[cards[0].children.length - 1].children[1];
+    chips0.children[0].fire('click');
+    const after = cards[0].children[0].textContent;
+    ok('\u9ede\u66ff\u4ee3\u554f\u6cd5\u6703\u63db\u6210\u90a3\u4e00\u984c', after !== before && after.indexOf(chips0.children[0].textContent) !== -1, after);
+    ok('\u63db\u984c\u5f8c\u4ecd\u4fdd\u7559\u4e94\u611f\u6a19\u7c64', after.indexOf('五感') !== -1, after);
+    ok('\u7b2c\u4e8c\u984c\u4ecd\u4fdd\u7559\u8f49\u6298\u6a19\u7c64', cards[1].children[0].textContent.indexOf('轉折') !== -1);
+  }
+  console.log('\n== 26. \u6bcf\u500b\u8f38\u5165\u6846\u90fd\u80fd\u7528\u8a9e\u97f3\u8f38\u5165 ==');
+  {
+    class FakeSR {
+      constructor() { this.lang = ''; this.continuous = false; this.interimResults = false; FakeSR.last = this; }
+      start() { if (this.onstart) this.onstart(); }
+      stop() { if (this.onend) this.onend(); }
+      emit(text, isFinal) {
+        const item = [{ transcript: text }];
+        item.isFinal = isFinal !== false;
+        if (this.onresult) this.onresult({ resultIndex: 0, results: [item] });
+      }
+    }
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') }
+    ], 'gsk_k', { SpeechRecognition: FakeSR });
+    const env = r.env;
+    ok('\u652f\u63f4\u8a9e\u97f3\u6642\u4e0d\u986f\u793a\u4e0d\u652f\u63f4\u8b66\u544a', env.get('speechUnsupported').classList.contains('hidden'));
+    ok('\u9ea5\u514b\u98a8\u6309\u9215\u4fdd\u7559', env.get('micBtn').classList.contains('hidden') === false);
+
+    env.get('micBtn').fire('click');
+    FakeSR.last.emit('我昨天去打籃球');
+    ok('\u53e3\u8ff0\u6846\u6536\u5230\u8a9e\u97f3\u6587\u5b57', env.get('rawText').value.indexOf('我昨天去打籃球') !== -1, env.get('rawText').value);
+    eq('\u5b57\u6578\u5373\u6642\u540c\u6b65', env.get('charCount').textContent, String(env.get('rawText').value.trim().length));
+    eq('\u8349\u7a3f\u4e5f\u540c\u6b65\u5b58\u4e0b\u4f86', env.store.get('wsm.draft'), env.get('rawText').value);
+    FakeSR.last.emit('因為下雨', false);
+    ok('\u5373\u6642\u5b57\u5e55\u986f\u793a\u5728\u53e3\u8ff0\u6846\u4e0b\u65b9', env.get('interim').textContent.indexOf('因為下雨') !== -1, env.get('interim').textContent);
+    FakeSR.last.stop();
+    ok('\u505c\u6b62\u5f8c\u5373\u6642\u5b57\u5e55\u6e05\u6389', env.get('interim').textContent === '');
+
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    const cards = env.get('questionsContainer').children;
+    const mic1 = cards[0].children[1].children[1];
+    mic1.fire('click');
+    FakeSR.last.emit('我聽到全場的歡呼聲');
+    ok('\u554f\u984c1 \u56de\u7b54\u6846\u4e5f\u80fd\u8a9e\u97f3\u8f38\u5165', env.get('q1').value.indexOf('我聽到全場的歡呼聲') !== -1, env.get('q1').value);
+    eq('\u56de\u7b54\u5df2\u66ab\u5b58', env.store.get('wsm.a-q1'), env.get('q1').value);
+    FakeSR.last.stop();
+    const mic2 = cards[1].children[1].children[1];
+    mic2.fire('click');
+    FakeSR.last.emit('因為教練提醒大家換位置');
+    ok('\u554f\u984c2 \u56de\u7b54\u6846\u4e5f\u80fd\u8a9e\u97f3\u8f38\u5165', env.get('q2').value.indexOf('因為教練提醒大家換位置') !== -1, env.get('q2').value);
+    eq('\u56de\u7b54\u4e8c\u4e5f\u5df2\u66ab\u5b58', env.store.get('wsm.a-q2'), env.get('q2').value);
   }
   console.log('\n' + '='.repeat(46));
   console.log('  PASS ' + pass + ' / FAIL ' + fail);
