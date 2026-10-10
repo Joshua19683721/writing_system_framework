@@ -91,7 +91,40 @@
     </div>
   </header>
 
-  <section id="step1" class="space-y-6 anim-fade">
+  <section id="modeSection" class="space-y-5 anim-fade">
+    <div class="text-center">
+      <h2 class="text-xl sm:text-2xl font-black text-slate-800">🎯 今天想練哪一種？</h2>
+      <p class="text-sm text-slate-500 font-bold mt-1">三種訓練依序加深：記敘結構 → 表達反思 → 說理論證</p>
+    </div>
+    <div id="modeCards" class="grid gap-3 md:grid-cols-3">
+      <button type="button" class="mode-card bg-white border-2 border-purple-200 hover:border-purple-400 rounded-3xl p-5 text-left transition shadow" data-mode="guided">
+        <div class="text-3xl mb-2">🧭</div>
+        <h3 class="font-black text-lg text-purple-900">引導式記敘</h3>
+        <p class="text-sm font-bold text-purple-700 mt-1 mb-2">國小低年級 ～ 初中</p>
+        <p class="text-sm text-slate-600 leading-relaxed">不會下筆也沒關係！照著 10 個環節一步步選，<b>4 選 1</b>就能湊出一篇完整作文。</p>
+        <p class="text-xs text-slate-500 font-bold mt-3">🧠 練：完整結構・五感描寫・因果連貫</p>
+      </button>
+      <button type="button" class="mode-card bg-white border-2 border-indigo-200 hover:border-indigo-400 rounded-3xl p-5 text-left transition shadow" data-mode="free">
+        <div class="text-3xl mb-2">🎤</div>
+        <h3 class="font-black text-lg text-indigo-900">先說後寫＋診斷</h3>
+        <p class="text-sm font-bold text-indigo-700 mt-1 mb-2">國小高年級 ～ 初中</p>
+        <p class="text-sm text-slate-600 leading-relaxed">先自由說／打字出來，導師再追問細節，最後給你<b>優缺點診斷卡</b>與錯別字修正。</p>
+        <p class="text-xs text-slate-500 font-bold mt-3">🧠 練：完整表達・反思・自我修正</p>
+      </button>
+      <button type="button" class="mode-card bg-white border-2 border-emerald-200 hover:border-emerald-400 rounded-3xl p-5 text-left transition shadow" data-mode="argue">
+        <div class="text-3xl mb-2">💡</div>
+        <h3 class="font-black text-lg text-emerald-900">說理・議論</h3>
+        <p class="text-sm font-bold text-emerald-700 mt-1 mb-2">初中核心</p>
+        <p class="text-sm text-slate-600 leading-relaxed">練習<b>提出看法、舉例論證、考慮反方</b>，寫出有說服力的說理文。</p>
+        <p class="text-xs text-slate-500 font-bold mt-3">🧠 練：立場・例證・反面思考・結論</p>
+      </button>
+    </div>
+    <p class="text-center text-xs text-slate-400 font-bold">💡 不確定？先從「🧭 引導式記敘」開始，最有成就感</p>
+  </section>
+
+  <section id="step1" class="hidden space-y-6 anim-fade">
+    <div id="modeBanner" class="rounded-2xl p-4 border-2 font-black"></div>
+
     <div class="bg-indigo-50 p-4 rounded-2xl border-2 border-indigo-100">
       <h2 class="text-lg sm:text-xl font-black text-indigo-900 mb-3">📍 選擇今天的練習主題</h2>
       <div id="topicChips" class="flex flex-wrap gap-3">
@@ -102,14 +135,14 @@
       </div>
       <div class="mt-3 flex flex-wrap items-center gap-3">
         <button type="button" id="randomTopicBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-4 py-2 rounded-xl transition shadow">🎲 隨機給我一個主題</button>
-        <span class="text-xs font-bold text-indigo-700">從 300 個國小常見主題裡抽一個，下面會出現寫法提示</span>
+        <span id="randomTopicNote" class="text-xs font-bold text-indigo-700"></span>
       </div>
       <div id="customTopicWrap" class="hidden mt-3">
         <input type="text" id="customTopic" maxlength="30" placeholder="例如：我最喜歡的一個週末" class="w-full px-4 py-2 border-2 border-indigo-200 rounded-xl bg-white focus:outline-none focus:border-indigo-500">
       </div>
     </div>
 
-    <div class="space-y-3">
+    <div id="freeBlock" class="hidden space-y-3">
       <div class="flex flex-wrap items-baseline justify-between gap-2">
         <label for="rawText" class="text-lg font-black text-slate-800">🎙️ 第一步：把你想說的話講出來或貼上來</label>
         <span class="text-sm font-bold text-slate-400"><span id="charCount">0</span> 字</span>
@@ -119,16 +152,21 @@
       <textarea id="rawText" rows="6" spellcheck="false" class="w-full text-lg p-4 border-2 border-slate-200 rounded-2xl focus:border-indigo-500 focus:outline-none" placeholder="例如：上個星期六我和同學去打籃球，我們本來輸三球，後來我很努力投進一個三分球，最後我們贏了，我覺得美不勝收，非常開心..."></textarea>
       <p id="interim" class="text-sm italic text-rose-500 min-h-[1.25rem]" aria-live="polite"></p>
       <p class="text-sm text-emerald-700 font-bold">💡 不用擔心寫錯字，像跟朋友聊天一樣，把發生的事情講出來就好喔！</p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <button type="button" id="micBtn" class="bg-rose-500 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🎙️ 按下開始說話</button>
+        <button type="button" id="clearBtn" class="bg-white text-slate-600 text-lg font-black py-4 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition">🧹 清除重打</button>
+        <button type="button" id="toNode1Btn" class="sm:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🚀 送出，進行思辨提問</button>
+      </div>
     </div>
 
-    <div class="grid gap-3 sm:grid-cols-2">
-      <button type="button" id="micBtn" class="bg-rose-500 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🎙️ 按下開始說話</button>
-      <button type="button" id="clearBtn" class="bg-white text-slate-600 text-lg font-black py-4 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition">🧹 清除重打</button>
-      <button type="button" id="toNode1Btn" class="sm:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🚀 送出，進行思辨提問</button>
+    <div id="guidedBlock" class="hidden space-y-3">
+      <div id="guidedHint" class="bg-purple-50 border-2 border-purple-200 rounded-2xl p-4 text-sm text-purple-900 leading-relaxed font-bold"></div>
+      <button type="button" id="startPathBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🧭 開始引導寫作（10 題・4 選 1）</button>
     </div>
-    <button type="button" id="startPathBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🧭 108 課綱引導寫作（選好主題 → 10 題・4 選 1）</button>
+
     <div id="step1Error"></div>
     <p id="speechUnsupported" class="hidden text-sm text-amber-700 bg-amber-50 border-2 border-amber-200 rounded-xl p-3 font-bold"></p>
+    <button type="button" id="backToModeBtn" class="w-full bg-white text-slate-600 font-black py-3 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition">⬅️ 換一種訓練方式</button>
   </section>
 
   <section id="pathSection" class="hidden space-y-5 bg-purple-50 p-5 md:p-6 rounded-3xl border-2 border-purple-200 anim-fade">
@@ -407,6 +445,83 @@
     '}'
   ].join('\n');
 
+  var PROMPT_ARG_QUESTIONS = [
+    '你是一位熟悉「十二年國教 108 課綱」素養導向教學的國文老師，專門訓練國中生的說理與議論能力。',
+    '孩子要討論的議題是下方【練習主題】的內容。',
+    '',
+    '【任務】請依說理文的寫作路徑，設計「剛好 10 個」引導問題，帶孩子一步步寫出一篇有說服力的說理文。',
+    '',
+    '【這 10 題的順序與重點】（務必依序涵蓋）：',
+    '1 議題、2 立場、3 理由一、4 例證、5 理由二、6 反方意見、7 我的回應、8 可能的影響、9 結論、10 建議。',
+    'stage 欄位請直接使用上面這 10 個環節名稱，不要改寫、不要自創新名稱。',
+    '',
+    '【每一題的選項規則】：',
+    '1. 每一題都必須提供「剛好 4 個選項」（4 選 1，讓孩子選一個）。',
+    '2. 選項要具體、可辯護，符合國中生程度，並貼近這個議題。',
+    '3. 選項不要全是空泛詞（例如「很好」「不錯」）。',
+    '4. 同一題的 4 個選項彼此要能並列，不能互相矛盾。',
+    '5. 問題和選項都要短，適合 13 歲小孩閱讀。',
+    '',
+    '【語言與格式規範】：',
+    '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
+    '2. 只輸出合法 JSON，不要加任何解釋文字、註解或 Markdown 符號。',
+    '',
+    '【輸出 JSON 格式】（以下僅示範前 2 題的「格式」，你必須實際輸出 g1 到 g10 共 10 個物件，每個物件剛好 4 個 options）：',
+    '{',
+    '  "questions": [',
+    '    { "id": "g1", "stage": "議題", "question_text": "我們要討論什麼問題？", "options": ["該不該做", "怎麼做更好", "對不對", "有沒有必要"] },',
+    '    { "id": "g2", "stage": "立場", "question_text": "你的看法是什麼？", "options": ["我認為應該", "我認為不應該", "我要看情況", "我還在想想"] }',
+    '  ]',
+    '}'
+  ].join('\n');
+
+  var PROMPT_ARG_COMPOSE = [
+    '你是一位國中國文寫作老師，教孩子寫說理文與議論文。',
+    '孩子已完成 10 個選擇題，請把這些選擇「組合」成一篇有說服力、條理清楚的說理文。',
+    '',
+    '【原則】：',
+    '1. 依說理文結構組織：提出議題 → 表明立場 → 理由與例證 → 反方意見與回應 → 影響 → 結論與建議。',
+    '2. 必須包含孩子選到的「反方意見」與「我的回應」，這是說理文最重要的部分，不可省略。',
+    '3. 只使用孩子選到的內容，不要新增與選擇無關的新論點。',
+    '4. 用孩子選到的理由與例子把論點串成通順的段落，可補上連接詞，但不可背離孩子的選擇。',
+    '5. 語氣誠懇有禮，尊重反對的人，不要用情緒化或罵人的詞。',
+    '6. 全文約 350～650 字。段落之間用換行分隔，不要加小標題、序號或項目符號。',
+    '',
+    '【語言與格式規範】：',
+    '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
+    '2. 只輸出合法 JSON，不要加任何解釋文字或 Markdown 符號。',
+    '',
+    '【輸出 JSON 格式】：',
+    '{',
+    '  "final_article": "把 10 個選擇組合而成的完整說理文，段落以換行分隔..."',
+    '}'
+  ].join('\n');
+
+  /* 首頁三種訓練模式：記敘結構 → 表達反思 → 說理論證 */
+  var MODES = {
+    guided: {
+      key: 'guided', kind: 'narrative', bank: 'TOPIC', pathBtn: '🧭 開始引導寫作（10 題・4 選 1）',
+      banner: '🧭 引導式記敘｜國小低年級～初中',
+      bannerCls: 'bg-purple-50 border-purple-200 text-purple-900',
+      hint: '不用自己從頭想！照著 10 個環節一步步挑選（每題 4 選 1），導師會把你的 10 個選擇寫成一篇文章。',
+      randomNote: '從 300 個國小常見主題裡抽一個'
+    },
+    free: {
+      key: 'free', kind: 'diagnose', bank: 'TOPIC', pathBtn: null,
+      banner: '🎤 先說後寫＋診斷｜國小高年級～初中',
+      bannerCls: 'bg-indigo-50 border-indigo-200 text-indigo-900',
+      hint: '先把你想說的話打出來或講出來，導師會追問細節，最後給你優缺點診斷卡。',
+      randomNote: '從 300 個國小常見主題裡抽一個'
+    },
+    argue: {
+      key: 'argue', kind: 'argument', bank: 'ARG', pathBtn: '💡 開始說理寫作（10 題・4 選 1）',
+      banner: '💡 說理・議論｜初中核心',
+      bannerCls: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+      hint: '練習提出看法、舉例論證，並練習「換個角度想」——包括站在反對的人那一邊。共 10 題，每題 4 選 1。',
+      randomNote: '從 30 個國中常見議題裡抽一個'
+    }
+  };
+
   /* ============================================================
      2. 設定
      ============================================================ */
@@ -468,6 +583,54 @@
     { stage: '行動', question: '接著你做了什麼？', options: ['我趕快想辦法解決', '我鼓起勇氣試一次', '我主動開口幫忙或道歉', '我堅持下去沒有放棄'] },
     { stage: '結果', question: '最後怎麼了？', options: ['事情順利完成', '雖然不完美但學到很多', '結果出乎意料', '大家開心地結束'] },
     { stage: '感想', question: '這件事之後，你有什麼感想？', options: ['我學會了堅持', '我更懂得體諒別人', '下次我會做得更好', '我很珍惜這次的經驗'] }
+  ];
+
+  /* 說理・議論文的十個環節（108 課綱初中：立場→理由→例證→反面→回應→結論） */
+  var ARG_STAGES = [
+    { stage: '議題', question: '這次要討論的問題是什麼？', options: ['可以討論「該不該」的問題', '可以討論「怎麼做才更好」的問題', '可以討論「對不對」的問題', '可以討論「有沒有必要」的問題'] },
+    { stage: '立場', question: '你的看法是什麼？', options: ['我認為應該這樣做', '我認為不應該這樣做', '我認為要看情況', '我還沒想好，但有了一個方向'] },
+    { stage: '理由一', question: '你為什麼這樣想？（原因）', options: ['因為對多數人比較好', '因為這樣比較公平', '因為有實際的問題需要解決', '因為我們應該負起責任'] },
+    { stage: '例子', question: '有什麼例子可以支持你的看法？', options: ['我自己的親身經驗', '學校或社區發生過的事', '新聞或網路上看過的案例', '歷史上或別國的例子'] },
+    { stage: '理由二', question: '還有別的理由嗎？', options: ['這樣做能省下很多時間', '這樣做對環境比較好', '這樣做能讓更多人參與', '這樣做比較安全'] },
+    { stage: '反方', question: '有人可能不同意，他會怎麼說？', options: ['他可能覺得太麻煩了', '他可能覺得沒有必要', '他可能擔心花太多錢', '他可能有完全不同的看法'] },
+    { stage: '回應', question: '你要怎麼回應這個反對意見？', options: ['我可以舉例說明為什麼值得', '我可以承認對方有道理的部分', '我可以提出折衷的做法', '我可以用數據或事實說明'] },
+    { stage: '影響', question: '如果照你的想法做，會有什麼影響？', options: ['會讓大家更方便', '會讓環境變得更好', '會讓成本或時間增加', '會改變大家現在的習慣'] },
+    { stage: '結論', question: '所以你的結論是什麼？', options: ['我支持我的看法', '我有一點改變想法', '我認為還需要更多討論', '我會從自己先做起'] },
+    { stage: '建議', question: '你想給大家什麼建議？', options: ['先從試試看開始', '大家一起討論會更好', '大人也該一起參與', '要有耐心，不要急'] }
+  ];
+
+  /* 說理文練習主題（國中會考常見的「該不該／好不好」議題），格式同 TOPIC_BANK */
+  var ARG_TOPIC_BANK = [
+    '學生在校園裡可以使用手機嗎|想想看：上課時分心，但查資料也很方便？',
+    '小學老師應該把成績排名公布出來嗎|想想看：會不會傷害沒考好的同學？',
+    '週末應該多去補習嗎|想想看：補得越多就一定越好嗎？',
+    '學校午餐應該提供素食嗎|想想看：少數的需求，值得特別安排嗎？',
+    '課後活動應該強制參加嗎|想想看：有的人想回家，有的人想留下來。',
+    '圖書館應該延長夜間開放嗎|想想看：晚上有人用嗎？管理成本誰出？',
+    '小學生應該學會自己煮飯嗎|想想看：安全問題和實際幫助。',
+    '公園應該蓋遊樂場還是運動場|想想看：不同年齡的人需要什麼？',
+    '網路上的言論應該先審核才能發布嗎|想想看：言論自由和保護別人怎麼平衡？',
+    '運動會應該取消冠軍制度嗎|想想看：競爭對團隊合作有幫還是有害？',
+    '中午的午睡時間應該取消嗎|想想看：有人精神好但有人真的需要休息。',
+    '學校應該禁止攜帶手機進校門嗎|想想看：安全、聯絡方便、家長安心。',
+    '路上的雨傘攤販應該保留嗎|想想看：生計和市容，誰比較重要？',
+    '小學生應該學程式嗎|想想看：現在學有用，還是以後再學？',
+    '寒暑假應該多學才藝嗎|想想看：休息和充實怎麼平衡？',
+    '公共場所應該全面禁止吸菸嗎|想想看：個人的選擇和公共健康。',
+    '動物實驗應該被禁止嗎|想想看：醫療進步和人道之間怎麼選。',
+    '超市的食物應該標示保存期限嗎|想想看：避免浪費還是增加成本？',
+    '社區應該多蓋停車場還是公園|想想看：每次有衝突的需求各是什麼？',
+    '孩子的零用錢該不該由家長決定怎麼花|想想看：練習自主和避免浪費。',
+    '學校應該延長放学到下午五點嗎|想想看：家長安心，但誰能接小孩？',
+    '網路影片應該設年齡限制嗎|想想看：保護小孩還是尊重自主？',
+    '運動應該是必修還是選修|想想看：有天分沒天分的人怎麼辦。',
+    '應該減少使用一次性塑膠嗎|想想看：方便很難戒，但環境在變差。',
+    '看圖片和看文字，哪種學得到比較多|想想看：兩種各有什麼好處？',
+    '考試應該改成口試嗎|想想看：測得到的能力和公平性。',
+    '動物收容所應該接受捐款嗎|想想看：需要幫助，但錢要怎麼用才對。',
+    '搭捷運還需要保留紙本車票嗎|想想看：方便和環境、習慣的關係。',
+    '孩子應該學會基本理財嗎|想想看：大人講的和實際生活差多少。',
+    '學校應該設立心理求助中心嗎|想想看：會不會被貼標籤？還是能幫到人。'
   ];
 
   // 題庫裡已內建提示；這裡補上四個固定主題的寫法提示
@@ -1273,11 +1436,24 @@
   function getTopicHintIndex() {
     if (topicHintIndex) return topicHintIndex;
     topicHintIndex = {};
-    for (var i = 0; i < TOPIC_BANK.length; i++) {
-      var parts = String(TOPIC_BANK[i]).split('|');
-      if (parts[0] && parts[1]) topicHintIndex[parts[0]] = parts[1];
+    var banks = [TOPIC_BANK, ARG_TOPIC_BANK];
+    for (var b = 0; b < banks.length; b++) {
+      for (var i = 0; i < banks[b].length; i++) {
+        var parts = String(banks[b][i]).split('|');
+        if (parts[0] && parts[1]) topicHintIndex[parts[0]] = parts[1];
+      }
     }
     return topicHintIndex;
+  }
+
+  // 目前選的訓練模式（未選時預設引導式記敘）
+  function currentMode() {
+    var m = MODES[store.get('mode')];
+    return m || MODES.guided;
+  }
+
+  function topicBankForMode() {
+    return currentMode().bank === 'ARG' ? ARG_TOPIC_BANK : TOPIC_BANK;
   }
 
   function topicHintFor(title) {
@@ -1286,7 +1462,7 @@
     return getTopicHintIndex()[title] || '';
   }
 
-  // 輸入框上方的小提示：這一題可以從開頭寫到結果的建議
+  // 輸入框上方的小提示：記敘題給「開頭→中間→結果」，說理題給「想想看」
   function updateTopicHint() {
     if (!els.topicHint) return;
     var hint = topicHintFor(currentTopic());
@@ -1295,17 +1471,19 @@
       els.topicHint.classList.add('hidden');
       return;
     }
-    els.topicHint.textContent = '📝 寫法提示（開頭 → 中間 → 結果）：' + hint;
+    var isArg = hint.indexOf('想想看') === 0;
+    els.topicHint.textContent = isArg ? hint : '📝 寫法提示（開頭 → 中間 → 結果）：' + hint;
     els.topicHint.classList.remove('hidden');
   }
 
-  // 從 300 個國小常見主題裡抽一個，並直接套用成這次的練習主題
+  // 依目前模式抽一個主題（記敘用 300 題庫，說理用 30 個議題）
   function applyRandomTopic() {
-    if (!TOPIC_BANK.length) return;
+    var bank = topicBankForMode();
+    if (!bank.length) return;
     var current = currentTopic();
-    var pick = TOPIC_BANK[Math.floor(Math.random() * TOPIC_BANK.length)];
+    var pick = bank[Math.floor(Math.random() * bank.length)];
     for (var i = 0; i < 12 && String(pick).split('|')[0] === current; i++) {
-      pick = TOPIC_BANK[Math.floor(Math.random() * TOPIC_BANK.length)];
+      pick = bank[Math.floor(Math.random() * bank.length)];
     }
     var title = String(pick).split('|')[0];
     els.customTopic.value = title;
@@ -1318,7 +1496,7 @@
     els.charCount.textContent = String(els.rawText.value.trim().length);
   }
 
-  var ALL_PANELS = ['step1', 'step2', 'step3', 'pathSection', 'pathResult'];
+  var ALL_PANELS = ['modeSection', 'step1', 'step2', 'step3', 'pathSection', 'pathResult'];
 
   function showPanel(id) {
     ALL_PANELS.forEach(function (pid) {
@@ -1637,19 +1815,31 @@
 
   var GUIDED_COUNT = 10;
 
-  var pathState = { topic: '', questions: [], answers: [] };
+  var pathState = { topic: '', kind: 'narrative', questions: [], answers: [] };
 
-  function buildGuidedFallback() {
-    return PATH_STAGES.map(function (s) {
+  // 依種類挑題庫與 prompt：記敘用 PATH_STAGES，說理用 ARG_STAGES
+  function stagesForKind(kind) {
+    return kind === 'argument' ? ARG_STAGES : PATH_STAGES;
+  }
+  function questionsPromptForKind(kind) {
+    return kind === 'argument' ? PROMPT_ARG_QUESTIONS : PROMPT_PATH_QUESTIONS;
+  }
+  function composePromptForKind(kind) {
+    return kind === 'argument' ? PROMPT_ARG_COMPOSE : PROMPT_PATH_COMPOSE;
+  }
+
+  function buildGuidedFallback(kind) {
+    return stagesForKind(kind).map(function (s) {
       return { stage: s.stage, question: s.question, options: s.options.slice(0, 4) };
     });
   }
 
   function normalizePathQuestions(data, topic) {
+    var kind = pathState.kind;
     var list = null;
     if (data && Array.isArray(data.questions)) list = data.questions;
     else if (Array.isArray(data)) list = data;
-    var fb = buildGuidedFallback();
+    var fb = buildGuidedFallback(kind);
     var out = [];
     if (list) {
       for (var i = 0; i < list.length && out.length < GUIDED_COUNT; i++) {
@@ -1748,16 +1938,25 @@
   }
 
   function startPath() {
+    var mode = currentMode();
     var topic = currentTopic();
-    if (!topic) { toast('先選一個主題（可以按 🎲 隨機抽題），再開始引導寫作。', 'err'); return Promise.resolve(); }
+    if (!topic) {
+      toast(mode.kind === 'argument'
+        ? '先選一個議題（可以按 🎲 隨機抽題），再開始說理寫作。'
+        : '先選一個主題（可以按 🎲 隨機抽題），再開始引導寫作。', 'err');
+      return Promise.resolve();
+    }
     pathState.topic = topic;
+    pathState.kind = mode.kind;
     pathState.questions = [];
     pathState.answers = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
     clearError('pathError');
     var badge = $('pathTopicBadge');
-    if (badge) badge.textContent = '📌 主題：' + topic;
-    showLoading('魔法導師正在為你安排 108 課綱的 10 個問題…');
-    return callGroq(PROMPT_PATH_QUESTIONS, '【練習主題】' + topic).then(function (raw) {
+    if (badge) badge.textContent = (mode.kind === 'argument' ? '📌 議題：' : '📌 主題：') + topic;
+    showLoading(pathState.kind === 'argument'
+      ? '魔法導師正在為你安排 10 個說理論點…'
+      : '魔法導師正在為你安排 108 課綱的 10 個問題…');
+    return callGroq(questionsPromptForKind(pathState.kind), '【練習主題】' + topic).then(function (raw) {
       pathState.questions = normalizePathQuestions(extractJson(raw), topic);
       renderPathQuestions(pathState.questions);
       updatePathProgress();
@@ -1771,13 +1970,16 @@
     var done = updatePathProgress();
     if (done < GUIDED_COUNT) { toast('還有 ' + (GUIDED_COUNT - done) + ' 題沒選完，全部選完才能寫成文章喔。', 'err'); return Promise.resolve(); }
     clearError('pathError');
-    showLoading('魔法導師正在把你的 10 個選擇寫成一篇文章…');
-    var lines = ['【練習主題】' + (pathState.topic || '（自由發揮）'), '', '【孩子完成的 108 課綱寫作路徑選擇】'];
+    var isArg = pathState.kind === 'argument';
+    showLoading(isArg ? '魔法導師正在把你的 10 個選擇寫成一篇說理文…'
+                       : '魔法導師正在把你的 10 個選擇寫成一篇文章…');
+    var lines = ['【練習主題】' + (pathState.topic || '（自由發揮）'), '',
+      isArg ? '【孩子完成的說理文寫作路徑選擇】' : '【孩子完成的 108 課綱寫作路徑選擇】'];
     pathState.questions.forEach(function (q, i) {
       var oi = pathState.answers[i];
       lines.push((i + 1) + '. ' + q.stage + '（' + q.question + '）：' + (oi >= 0 ? q.options[oi] : ''));
     });
-    return callGroq(PROMPT_PATH_COMPOSE, lines.join('\n')).then(function (raw) {
+    return callGroq(composePromptForKind(pathState.kind), lines.join('\n')).then(function (raw) {
       var article = fixTypos(normalizePathEssay(extractJson(raw)), []);
       renderPathEssay(article);
       showPanel('pathResult');
@@ -1787,10 +1989,13 @@
   }
 
   function renderPathEssay(article) {
+    var isArg = pathState.kind === 'argument';
+    var lo = isArg ? 350 : 300, hi = isArg ? 650 : 600;
+    var label = isArg ? '國中說理文' : '小學記敘文';
     $('pathEssay').textContent = article;
     var n = article.replace(/\s+/g, '').length;
     $('pathWordNote').textContent = '全文約 ' + n + ' 字'
-      + (n >= 300 && n <= 600 ? ' ✅ 長度很適合小學記敘文！' : '（小學記敘文大約 300～600 字，可以再想想）');
+      + (n >= lo && n <= hi ? ' ✅ 長度很適合' + label + '！' : '（' + label + '大約 ' + lo + '～' + hi + ' 字，可以再想想）');
     var ul = $('pathSummary');
     ul.textContent = '';
     pathState.questions.forEach(function (q, i) {
@@ -1799,11 +2004,12 @@
       li.textContent = q.stage + '：' + (oi >= 0 ? q.options[oi] : '（未選擇）');
       ul.appendChild(li);
     });
-    $('pathMeta').textContent = '練習主題：' + (pathState.topic || '自由練習') + '　｜　' + new Date().toLocaleDateString('zh-TW');
+    $('pathMeta').textContent = (isArg ? '說理文主題：' : '練習主題：') + (pathState.topic || '自由練習')
+      + '　｜　' + new Date().toLocaleDateString('zh-TW');
   }
 
   function resetPath() {
-    pathState = { topic: '', questions: [], answers: [] };
+    pathState = { topic: '', kind: currentMode().kind, questions: [], answers: [] };
     var l = $('pathList'); if (l) l.textContent = '';
     var e = $('pathEssay'); if (e) e.textContent = '';
     var w = $('pathWordNote'); if (w) w.textContent = '';
@@ -1989,6 +2195,34 @@
     }
   }
 
+  // 選擇訓練模式：更新畫面配置後進入主題選擇
+  function selectMode(key) {
+    var mode = MODES[key];
+    if (!mode) return;
+    store.set('mode', key);
+    resetPath();
+
+    var banner = $('modeBanner');
+    if (banner) {
+      banner.textContent = mode.banner;
+      banner.className = 'rounded-2xl p-4 border-2 font-black ' + mode.bannerCls;
+    }
+    var freeBlock = $('freeBlock');
+    var guidedBlock = $('guidedBlock');
+    var isFree = mode.kind === 'diagnose';
+    if (freeBlock) freeBlock.classList.toggle('hidden', !isFree);
+    if (guidedBlock) guidedBlock.classList.toggle('hidden', isFree);
+    var gh = $('guidedHint');
+    if (gh) gh.textContent = mode.hint;
+    var pb = $('startPathBtn');
+    if (pb && mode.pathBtn) pb.textContent = mode.pathBtn;
+    var rn = $('randomTopicNote');
+    if (rn) rn.textContent = mode.randomNote + '，選好後就會出現寫法提示';
+
+    updateTopicHint();
+    showPanel('step1');
+  }
+
   function bindEvents() {
     $('settingsToggle').addEventListener('click', function () {
       var panel = $('settingsPanel');
@@ -2028,6 +2262,18 @@
     });
 
     $('randomTopicBtn').addEventListener('click', applyRandomTopic);
+
+    $('modeCards').addEventListener('click', function (ev) {
+      var btn = ev.target.closest ? ev.target.closest('.mode-card') : null;
+      if (!btn) return;
+      selectMode(btn.getAttribute('data-mode'));
+    });
+
+    $('backToModeBtn').addEventListener('click', function () {
+      resetPath();
+      clearError('step1Error');
+      showPanel('modeSection');
+    });
 
     els.customTopic.addEventListener('input', function () {
       store.set('customTopic', els.customTopic.value.trim());
@@ -2149,7 +2395,7 @@
     $('wordCountNote').textContent = '';
     resetPath();
     setKeyStatus();
-    showStep(1);
+    showPanel('modeSection');
     toast('準備好開始新的一篇了！', 'ok');
   }
 
@@ -2185,9 +2431,18 @@
     restoreTopic();
     updateCount();
     updateBadge();
-    updateTopicHint();
     setupSpeech();
     bindEvents();
+
+    // 入口一律從「選訓練模式」開始；已選過的模式直接進該模式的主題頁
+    var savedMode = store.get('mode');
+    if (savedMode && MODES[savedMode]) {
+      selectMode(savedMode);
+      if (store.get('draft') && els.rawText.value) showStep(2);
+    } else {
+      updateTopicHint();
+      showPanel('modeSection');
+    }
   }
 
   if (document.readyState === 'loading') {

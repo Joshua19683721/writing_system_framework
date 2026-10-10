@@ -94,6 +94,15 @@ function makeEnv() {
       el.setAttribute('data-topic', attrs.match(/\bdata-topic="([^"]+)"/)[1]);
       el.setAttribute('aria-pressed', attrs.match(/\baria-pressed="([^"]+)"/)[1]);
     }
+    // 首頁的訓練模式卡（data-mode），需掛到 modeCards 容器下
+    const mre = /<button\b([^>]*\bdata-mode="[^"]+"[^>]*)>/g;
+    while ((m = mre.exec(HTML)) !== null) {
+      const attrs = m[1];
+      const el = make('button');
+      applyClass(el, attrs);
+      el.setAttribute('data-mode', attrs.match(/\bdata-mode="([^"]+)"/)[1]);
+      getById('modeCards').appendChild(el);
+    }
   }
   const body = make('body');
   const document = {
@@ -372,7 +381,8 @@ async function boot(responses, keyValue, opts) {
     ok('\u81ea\u8a02\u4e3b\u984c\u5beb\u5165\u5fbd\u7ae0', env.get('topicBadge').textContent.indexOf('\u9031\u665a') !== -1);
     env.get('restartBtn').fire('click');
     eq('\u91cd\u958b\u5f8c\u8349\u7a3f\u5df2\u6e05', env.get('rawText').value, '');
-    eq('\u91cd\u958b\u5f8c\u56de\u5230 Step1', env.get('step1').classList.contains('hidden'), false);
+    eq('\u91cd\u958b\u5f8c\u56de\u5230\u7009\u6a21\u5f0f\u9801', env.get('modeSection').classList.contains('hidden'), false);
+ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5165\u4e3b\u984c\u9801\uff09', env.get('step1').classList.contains('hidden'));
     eq('\u91cd\u958b\u5f8c API Key \u4fdd\u7559\uff08\u88dd\u7f6e\u5c64\uff09', env.store.get('wsm.key'), 'gsk_k');
     eq('\u91cd\u958b\u5f8c\u4e3b\u984c\u5df2\u6e05', env.store.get('wsm.topic'), undefined);
     eq('\u91cd\u958b\u5f8c\u56de\u7b54\u5df2\u6e05', env.store.get('wsm.a-q1'), undefined);
@@ -842,6 +852,10 @@ async function boot(responses, keyValue, opts) {
   };
   const stageOf = function (card) { return card.children[0].children[1].textContent; };
   const optsOf = function (card) { return card.children[1].children; };
+  const pickMode = function (env, idx) {
+    const cards = env.get('modeCards').children;
+    env.get('modeCards').fire('click', { target: cards[idx] });
+  };
 
   console.log('\n== 27. 108 課綱引導寫作：隨機主題 → 10 題 → 4 選 1 → 合成文章 ==');
   {
@@ -1082,7 +1096,15 @@ async function boot(responses, keyValue, opts) {
     // 缺陷 2：UI 檢查 300～600 字，但 prompt 從未要求篇幅
     ok('合成 prompt 有要求 300～600 字', /300～600 字/.test(c));
     ok('合成 prompt 說明要展開成具體細節', c.indexOf('不要只把選項短短串接') !== -1);
-    ok('UI 檢的字數區間與 prompt 一致', HTML.indexOf('n >= 300 && n <= 600') !== -1);
+    const ca = grab('PROMPT_ARG_COMPOSE');
+    ok('UI \u6aa2\u7684\u5b57\u6578\u5340\u9593\u8207 prompt \u4e00\u81f4',
+       /var lo = isArg \? 350 : 300, hi = isArg \? 650 : 600;/.test(HTML) &&
+       ca.indexOf('350～650 字') !== -1 &&
+       c.indexOf('300～600 字') !== -1);
+    ok('說理文要求保留反方意見與回應',
+       ca.indexOf('反方意見') !== -1 && ca.indexOf('我的回應') !== -1);
+    ok('說理文禁止情緒化用詞',
+       ca.indexOf('不要用情緒化或罵人的詞') !== -1);
 
     // 強化：降低模型只回 2 題、需要保底補滿的機率
     ok('強調只是格式示範、仍須輸出 10 個物件', q.indexOf('你必須實際輸出 g1 到 g10 共 10 個物件') !== -1);
@@ -1142,6 +1164,133 @@ async function boot(responses, keyValue, opts) {
     env.get('pathRegenBtn').fire('click');
     ok('選擇未完成時不發請求', r.calls.length === 1, 'calls=' + r.calls.length);
     ok('會自動回到題目區', env.get('pathSection').classList.contains('hidden') === false);
+  }
+
+  console.log('\n== 36. 首頁三種訓練模式 ==');
+  {
+    const r = await boot([], 'gsk_k');
+    const env = r.env;
+    ok('入口顯示模式選擇頁', !env.get('modeSection').classList.contains('hidden'));
+    ok('主題頁尚未顯示', env.get('step1').classList.contains('hidden'));
+    const cards = env.get('modeCards').children;
+    eq('提供三種模式', cards.length, 3);
+    eq('模式鍵值正確',
+       cards.map(c => c.getAttribute('data-mode')).join(','), 'guided,free,argue');
+
+    // 選「引導式記敘」
+    pickMode(env, 0);
+    ok('選擇後進入主題頁', !env.get('step1').classList.contains('hidden'));
+    ok('模式選擇頁收起', env.get('modeSection').classList.contains('hidden'));
+    ok('顯示引導區塊', !env.get('guidedBlock').classList.contains('hidden'));
+    ok('隱藏自由書寫區塊', env.get('freeBlock').classList.contains('hidden'));
+    ok('顯示模式橫幅', env.get('modeBanner').textContent.indexOf('引導式記敘') !== -1);
+    ok('引導按鈕文案正確', env.get('startPathBtn').textContent.indexOf('10 題') !== -1);
+    eq('記住模式', env.store.get('wsm.mode'), 'guided');
+
+    // 選「先說後寫」
+    env.get('backToModeBtn').fire('click');
+    ok('可回到模式頁', !env.get('modeSection').classList.contains('hidden'));
+    pickMode(env, 1);
+    ok('診斷模式顯示自由書寫區', !env.get('freeBlock').classList.contains('hidden'));
+    ok('診斷模式隱藏引導區', env.get('guidedBlock').classList.contains('hidden'));
+    eq('記住診斷模式', env.store.get('wsm.mode'), 'free');
+
+    // 選「說理・議論」
+    env.get('backToModeBtn').fire('click');
+    pickMode(env, 2);
+    ok('說理模式顯示引導區', !env.get('guidedBlock').classList.contains('hidden'));
+    ok('說理按鈕文案正確', env.get('startPathBtn').textContent.indexOf('說理') !== -1);
+    ok('說理模式提示提到反方', env.get('guidedHint').textContent.indexOf('反對') !== -1);
+    ok('說理模式抽題說明正確', env.get('randomTopicNote').textContent.indexOf('30 個') !== -1,
+       env.get('randomTopicNote').textContent);
+    eq('記住說理模式', env.store.get('wsm.mode'), 'argue');
+  }
+
+  console.log('\n== 37. 說理模式完整流程 ==');
+  {
+    const ARG = ['議題','立場','理由一','例子','理由二','反方','回應','影響','結論','建議'];
+    const AQ = ARG.map((s, i) => ({ id: 'g' + (i + 1), stage: s,
+      question_text: '請選擇：' + s, options: ['甲' + (i+1), '乙' + (i+1), '丙' + (i+1), '丁' + (i+1)] }));
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: AQ })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '我認為應該討論這個問題。\\n\\n理由是這樣。\\n\\n有人可能不同意，但我認為仍值得。\\n\\n所以我提出這個建議。' })) }
+    ], 'gsk_k');
+    const env = r.env;
+    pickMode(env, 2);
+    env.get('randomTopicBtn').fire('click');
+    const topic = env.store.get('wsm.customTopic');
+    ok('抽到的是議題庫裡的主題', !!topic, topic);
+
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+
+    const cards = env.get('pathList').children;
+    eq('說理模式也是 10 題', cards.length, 10);
+    ok('依說理文順序',
+       ARG.every((s, i) => stageOf(cards[i]) === s),
+       cards.map(c => stageOf(c)).join('>'));
+    ok('每題 4 選 1', cards.every(c => optsOf(c).length === 4));
+    ok('徽章標示為議題', env.get('pathTopicBadge').textContent.indexOf('議題') !== -1,
+       env.get('pathTopicBadge').textContent);
+
+    const g1 = JSON.parse(r.calls[0].opts.body);
+    ok('使用說理出題 prompt', g1.messages[0].content.indexOf('說理與議論能力') !== -1);
+    ok('user 帶入議題', g1.messages[1].content.indexOf(topic) !== -1);
+
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathResult').classList.contains('hidden') === false);
+
+    ok('產出說理文', env.get('pathEssay').textContent.length > 0);
+    eq('摘要列出 10 個論點', env.get('pathSummary').children.length, 10);
+    ok('字數提示用說理文標準',
+       env.get('pathWordNote').textContent.indexOf('國中說理文') !== -1,
+       env.get('pathWordNote').textContent);
+    ok('meta 標示說理文', env.get('pathMeta').textContent.indexOf('說理文主題') !== -1);
+
+    const g2 = JSON.parse(r.calls[1].opts.body);
+    ok('使用說理合成 prompt', g2.messages[0].content.indexOf('說理文與議論文') !== -1);
+    ok('合成 prompt 帶入 10 個選擇', (g2.messages[1].content.match(/甲/g) || []).length === 10);
+    ok('合成 prompt 標示說理路徑', g2.messages[1].content.indexOf('說理文寫作路徑選擇') !== -1);
+  }
+
+  console.log('\n== 38. 說理模式缺漏時以 ARG_STAGES 補滿 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: [] })) }
+    ], 'gsk_k');
+    const env = r.env;
+    pickMode(env, 2);
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    const cards = env.get('pathList').children;
+    eq('保底補滿 10 題', cards.length, 10);
+    ok('保底走說理階段而非記敘階段',
+       cards[0] && stageOf(cards[0]) === '議題' && stageOf(cards[9]) === '建議',
+       cards.map(c => stageOf(c)).join('>'));
+    ok('不會誤用記敘的「人物」', cards.map(c => stageOf(c)).indexOf('人物') === -1);
+    ok('保底題目有 4 個選項', cards.every(c => optsOf(c).length === 4));
+  }
+
+  console.log('\n== 39. 議題題庫品質 ==');
+  {
+    const start = HTML.indexOf('var ARG_TOPIC_BANK = [');
+    const block = HTML.slice(start, HTML.indexOf('];', start));
+    const items = [...block.matchAll(/'([^']+)'/g)].map(m => m[1]);
+    eq('有 30 個議題', items.length, 30);
+    ok('每個議題都有寫作提示', items.every(s => s.split('|').length === 2 && s.split('|')[1].length > 4));
+    ok('議題不重複', new Set(items.map(s => s.split('|')[0])).size === 30);
+    ok('議題都是可辯論的問句', items.every(s => /嗎|該不該|有沒有|好不好|還是|哪種|比較/.test(s.split('|')[0])),
+       items.filter(s => !/嗎|該不該|有沒有|好不好|還是|哪種|比較/.test(s.split('|')[0])).join(' / '));
+    ok('沒有殘留「看看看」錯字', block.indexOf('看看看') === -1);
+
+    const ARGST = HTML.slice(HTML.indexOf('var ARG_STAGES = ['), HTML.indexOf('];', HTML.indexOf('var ARG_STAGES = [')));
+    const stages = [...ARGST.matchAll(/stage: '([^']+)'/g)].map(m => m[1]);
+    eq('ARG_STAGES 有 10 個環節', stages.length, 10);
+    ok('包含反方與回應（說理文核心）', stages.indexOf('反方') !== -1 && stages.indexOf('回應') !== -1);
+    const optCounts = [...ARGST.matchAll(/options: \[([^\]]*)\]/g)].map(m => (m[1].match(/'/g) || []).length / 2);
+    ok('每個環節 4 個選項', optCounts.length === 10 && optCounts.every(c => c === 4));
   }
 
   console.log('\n' + '='.repeat(46));
