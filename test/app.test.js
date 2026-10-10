@@ -205,7 +205,7 @@ async function boot(responses, keyValue, opts) {
     eq('node1 \u53ea\u8b21\u4e00\u6b21\u7d50\u675f', r.calls.length, 1);
     const sent = JSON.parse(r.calls[0].opts.body);
     eq('endpoint \u6b63\u78ba', r.calls[0].url, 'https://api.groq.com/openai/v1/chat/completions');
-    eq('model \u9810\u8a2d', sent.model, 'llama-3.3-70b-versatile');
+    eq('model \u9810\u8a2d', sent.model, 'qwen/qwen3.8-27b');
     eq('system role', sent.messages[0].role, 'system');
     eq('user role', sent.messages[1].role, 'user');
     ok('Node1 system prompt', sent.messages[0].content.indexOf('\u5f15\u5c0e\u554f\u984c') !== -1);

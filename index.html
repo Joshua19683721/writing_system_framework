@@ -63,11 +63,12 @@
           <label for="modelInput" class="block text-xs font-black text-amber-800 mb-1">🧠 模型名稱</label>
           <input type="text" id="modelInput" list="modelList" spellcheck="false" class="w-full px-3 py-2 text-sm border-2 border-amber-200 rounded-xl bg-white focus:outline-none focus:border-amber-500">
           <datalist id="modelList">
+            <option value="qwen/qwen3.8-27b"></option>
             <option value="llama-3.3-70b-versatile"></option>
             <option value="llama-3.1-8b-instant"></option>
             <option value="openai/gpt-oss-120b"></option>
           </datalist>
-          <p class="text-xs mt-1 text-amber-700">預設 llama-3.3-70b-versatile（繁體中文品質最好）。最新清單見 console.groq.com/docs/models</p>
+          <p class="text-xs mt-1 text-amber-700">預設 qwen/qwen3.8-27b。最新清單見 console.groq.com/docs/models</p>
         </div>
       </div>
       <p class="text-xs text-amber-800 bg-amber-100/60 rounded-xl p-2 leading-relaxed">🔒 你的 API Key 只存在「這台電腦的瀏覽器」裡（localStorage），不會上傳到任何伺服器。請不要在公用電腦上儲存，用完記得按「清除」。</p>
@@ -300,7 +301,7 @@
 
   var CONFIG = {
     endpoint: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    model: 'qwen/qwen3.8-27b',
     temperature: 0.7,
     maxTokens: 2048,
     timeoutMs: 60000,
