@@ -1060,6 +1060,44 @@ async function boot(responses, keyValue, opts) {
        /#printArea \.print-plain/.test(printBlock) && /#pathPrintArea \.print-plain/.test(printBlock));
   }
 
+  console.log('\n== 34. 引導寫作的 prompt 品質 ==');
+  {
+    const pi = HTML.indexOf('@media print');
+    // 取出兩份 path prompt 原文
+    const grab = (name) => {
+      const i = HTML.indexOf('var ' + name + ' = [');
+      const j = HTML.indexOf('].join', i);
+      return HTML.slice(i, j);
+    };
+    const q = grab('PROMPT_PATH_QUESTIONS');
+    const c = grab('PROMPT_PATH_COMPOSE');
+    ok('取得出題 prompt', q.length > 100);
+    ok('取得合成 prompt', c.length > 100);
+
+    // 缺陷 1：示範例的問與答自相矛盾
+    ok('示範例不再問「有哪兩個人」', q.indexOf('哪兩個人') === -1);
+    ok('示範例改用可並列的問法', q.indexOf('故事裡有誰一起參與') !== -1);
+    ok('明列選項不可互相矛盾', q.indexOf('不能互相矛盾') !== -1);
+
+    // 缺陷 2：UI 檢查 300～600 字，但 prompt 從未要求篇幅
+    ok('合成 prompt 有要求 300～600 字', /300～600 字/.test(c));
+    ok('合成 prompt 說明要展開成具體細節', c.indexOf('不要只把選項短短串接') !== -1);
+    ok('UI 檢的字數區間與 prompt 一致', HTML.indexOf('n >= 300 && n <= 600') !== -1);
+
+    // 強化：降低模型只回 2 題、需要保底補滿的機率
+    ok('強調只是格式示範、仍須輸出 10 個物件', q.indexOf('你必須實際輸出 g1 到 g10 共 10 個物件') !== -1);
+    ok('要求 stage 沿用既有環節名稱', q.indexOf('不要改寫、不要自創新名稱') !== -1);
+
+    // 回歸：確保沒有損壞字元（撰寫文件／prompt 時曾發生過）
+    // 用跳脫序列比對，不可直接內嵌 U+FFFD，否則這個檢查會把自己判成損壞
+    const FFFD = /\uFFFD/g;
+    eq('index.html 沒有損壞字元 (U+FFFD)', (HTML.match(FFFD) || []).length, 0);
+    const badT = (fs.readFileSync(path.join(DIR, 'test/app.test.js'), 'utf8').match(FFFD) || []).length;
+    eq('test/app.test.js 沒有損壞字元', badT, 0);
+    const badD = (fs.readFileSync(path.join(DIR, 'writing_system_framework.md'), 'utf8').match(FFFD) || []).length;
+    eq('規格文件沒有損壞字元', badD, 0);
+  }
+
   console.log('\n' + '='.repeat(46));
   console.log('  PASS ' + pass + ' / FAIL ' + fail);
   console.log('='.repeat(46));
