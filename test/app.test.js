@@ -1293,6 +1293,91 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     ok('每個環節 4 個選項', optCounts.length === 10 && optCounts.every(c => c === 4));
   }
 
+  console.log('\n== 40. 每一題都有第 5 個選項「自己寫」 ==');
+  {
+    const ownOf = function (card) { return card.children[2]; };
+    const ownInputOf = function (card) { return ownOf(card).children[1]; };
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '用自己寫的內容組成的文章。' })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '第二次合成，含自己寫的內容。' })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+
+    const cards = env.get('pathList').children;
+    eq('10 題都有自己寫的欄位',
+       cards.filter(c => c.children.length === 3 && ownInputOf(c).tagName === 'INPUT').length, 10);
+    ok('第 5 選項有標題', ownOf(cards[0]).children[0].textContent.indexOf('我自己寫') !== -1);
+    ok('有依環節給的寫作提示', ownInputOf(cards[0]).placeholder.indexOf('還有誰也在場') !== -1,
+       ownInputOf(cards[0]).placeholder);
+    ok('提示依環節不同', ownInputOf(cards[4]).placeholder !== ownInputOf(cards[0]).placeholder);
+    eq('一開始不算已作答', env.get('pathProgress').textContent, '已回答 0 / 10');
+
+    // 填入自己寫的內容即視為作答，並取代 4 個選項
+    optsOf(cards[0])[1].fire('click');
+    eq('先選第 2 個選項', env.get('pathProgress').textContent, '已回答 1 / 10');
+    ownInputOf(cards[0]).value = '還有導師站在後面幫忙';
+    ownInputOf(cards[0]).fire('input');
+    eq('自己寫也算已作答', env.get('pathProgress').textContent, '已回答 1 / 10');
+    ok('自己寫的欄位被標示啟用', ownOf(cards[0]).getAttribute('data-active') === 'true');
+    ok('原本選的按鈕已取消選取', optsOf(cards[0])[1].getAttribute('aria-pressed') === 'false');
+
+    // 清空後就不再算已作答
+    ownInputOf(cards[0]).value = '';
+    ownInputOf(cards[0]).fire('input');
+    eq('清空後回到未作答', env.get('pathProgress').textContent, '已回答 0 / 10');
+
+    // 只有空白字元不算
+    ownInputOf(cards[0]).value = '   ';
+    ownInputOf(cards[0]).fire('input');
+    eq('只有空白字元不算已作答', env.get('pathProgress').textContent, '已回答 0 / 10');
+    ownInputOf(cards[0]).value = '';
+
+    // 改選上面按鈕會清掉自己寫的內容
+    ownInputOf(cards[0]).value = '我自己寫的答案';
+    ownInputOf(cards[0]).fire('input');
+    optsOf(cards[0])[3].fire('click');
+    eq('改選按鈕會清空自己寫的欄位', ownInputOf(cards[0]).value, '');
+    eq('改選後仍算已作答（用該按鈕）', env.get('pathProgress').textContent, '已回答 1 / 10');
+
+    // 混合作答：3 題按鈕、7 題自己寫
+    for (let i = 0; i < 3; i++) optsOf(cards[i])[0].fire('click');
+    for (let i = 3; i < 10; i++) {
+      ownInputOf(cards[i]).value = '第' + (i + 1) + '題我自己寫的內容';
+      ownInputOf(cards[i]).fire('input');
+    }
+    eq('混合作答全數計入', env.get('pathProgress').textContent, '已回答 10 / 10');
+    ok('全部完成即可合成', env.get('pathComposeBtn').disabled === false);
+
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathResult').classList.contains('hidden') === false);
+    const g = JSON.parse(r.calls[1].opts.body);
+    ok('自己寫的內容有帶給模型',
+       g.messages[1].content.indexOf('第4題我自己寫的內容') !== -1);
+    ok('按鈕選的內容也有帶入', g.messages[1].content.indexOf('選項A1') !== -1);
+    eq('選擇摘要仍是 10 筆', env.get('pathSummary').children.length, 10);
+    ok('摘要標示出是自己寫的', env.get('pathSummary').children[3].textContent.indexOf('✏️') !== -1,
+       env.get('pathSummary').children[3].textContent);
+    ok('摘要含自己寫的內容', env.get('pathSummary').children[3].textContent.indexOf('第4題我自己寫的內容') !== -1);
+    ok('摘要裡按鈕選的不加符號', env.get('pathSummary').children[0].textContent.indexOf('✏️') === -1);
+
+    // XSS：自己寫的內容只當純文字
+    env.get('pathEditBtn').fire('click');
+    ownInputOf(cards[0]).value = '<img src=x onerror=alert(1)>';
+    ownInputOf(cards[0]).fire('input');
+    for (let i = 1; i < 10; i++) {
+      if (env.get('pathComposeBtn').disabled) { optsOf(cards[i])[0].fire('click'); }
+    }
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathResult').classList.contains('hidden') === false);
+    const li = env.get('pathSummary').children[0];
+    ok('自己寫的 HTML 只顯示為文字', li.children.length === 0 && li.textContent.indexOf('<img') !== -1,
+       li.textContent.slice(0, 40));
+  }
+
   console.log('\n' + '='.repeat(46));
   console.log('  PASS ' + pass + ' / FAIL ' + fail);
   console.log('='.repeat(46));

@@ -42,6 +42,15 @@
   .path-opt:hover { border-color:#a855f7; }
   .path-opt[aria-pressed="true"] { background:#7c3aed; color:#fff; border-color:#7c3aed; }
 
+  /* 第 5 個選項：自己寫。填了就取代上面 4 個選項 */
+  .path-own { margin-top:.5rem; border:2px dashed #c4b5fd; border-radius:.75rem; background:#faf5ff; padding:.5rem .75rem;
+    display:flex; flex-direction:column; gap:.25rem; transition:border-color .15s, background .15s; }
+  .path-own-label { font-weight:900; color:#6b21a8; font-size:.8rem; }
+  .path-own-input { width:100%; border:0; background:transparent; outline:none; font-weight:700;
+    color:#3b0764; font-size:.95rem; line-height:1.7; }
+  .path-own-input::placeholder { color:#a78bfa; font-weight:600; }
+  .path-own[data-active="true"] { border-color:#7c3aed; border-style:solid; background:#f3e8ff; }
+
   @media print {
     body { background:#fff !important; }
     .no-print { display: none !important; }
@@ -1815,7 +1824,7 @@
 
   var GUIDED_COUNT = 10;
 
-  var pathState = { topic: '', kind: 'narrative', questions: [], answers: [] };
+  var pathState = { topic: '', kind: 'narrative', questions: [], answers: [], customs: [] };
 
   // 依種類挑題庫與 prompt：記敘用 PATH_STAGES，說理用 ARG_STAGES
   function stagesForKind(kind) {
@@ -1876,9 +1885,54 @@
     return article;
   }
 
+  // 第 5 個選項＝孩子自己寫。索引 4 代表「用自己寫的」
+  var CUSTOM_OPT = 4;
+
+  // 每個環節給一句「句子骨架」，提示孩子可以怎麼寫，降低空白欄位的門檻
+  var OWN_FRAMES = {
+    '人物': '例如：還有誰也在場？他幫了什麼忙？',
+    '時間': '例如：那天下午第三節下課以後',
+    '地點': '例如：學校後面的籃球場',
+    '起因': '例如：因為隊友受傷了，我們臨時換人',
+    '五感': '例如：聽到球鞋摩擦地板的聲音，手心冒汗',
+    '心情': '例如：又緊張又怕丟臉',
+    '轉折': '例如：打到最後我們突然換了戰術',
+    '行動': '例如：我深呼吸後再投一次',
+    '結果': '例如：最後我們贏了兩分',
+    '感想': '例如：我下次遇到困難不要那麼快放棄',
+    '議題': '例如：我們要討論的是「該不該用手機」',
+    '立場': '例如：我認為應該，但要有規則',
+    '理由一': '例如：因為這樣對多數人都比較方便',
+    '例子': '例如：我們班去年就發生過類似的事',
+    '理由二': '例如：而且這樣能省下很多時間',
+    '反方': '例如：有人覺得這樣會讓人變懶',
+    '回應': '例如：但我們可以先從限時使用開始',
+    '影響': '例如：大家會更願意放下手機',
+    '結論': '例如：所以我支持這項做法',
+    '建議': '例如：建議學校先試一個月看看效果'
+  };
+
+  function ownFrameFor(stage) { return OWN_FRAMES[stage] || '✏️ 自己寫一個答案（會取代上面 4 個選項）'; }
+
+  // 這一題目前的作答文字（含自己寫的內容）
+  function answerTextFor(qi) {
+    var q = pathState.questions[qi];
+    if (!q) return '';
+    var oi = pathState.answers[qi];
+    if (oi === CUSTOM_OPT) return (pathState.customs[qi] || '').trim();
+    return oi >= 0 && oi < CUSTOM_OPT ? (q.options[oi] || '') : '';
+  }
+
+  // 這一題算不算已作答：選了 4 個之一，或自己寫了非空白內容
+  function isPathAnswered(qi) {
+    var oi = pathState.answers[qi];
+    if (oi === CUSTOM_OPT) return !!(pathState.customs[qi] || '').trim();
+    return oi >= 0 && oi < CUSTOM_OPT;
+  }
+
   function updatePathProgress() {
     var done = 0;
-    for (var i = 0; i < pathState.answers.length; i++) if (pathState.answers[i] >= 0) done++;
+    for (var i = 0; i < GUIDED_COUNT; i++) if (isPathAnswered(i)) done++;
     var p = $('pathProgress');
     if (p) p.textContent = '已回答 ' + done + ' / ' + GUIDED_COUNT;
     var btn = $('pathComposeBtn');
@@ -1886,19 +1940,48 @@
     return done;
   }
 
+  // 選上面 4 個按鈕之一；同時清掉自己寫的內容
   function selectPathOption(qi, oi) {
     pathState.answers[qi] = oi;
     var btns = pathOptBtns[qi] || [];
     for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', i === oi ? 'true' : 'false');
+    if (oi !== CUSTOM_OPT && pathCustomInputs[qi]) {
+      pathCustomInputs[qi].value = '';
+      pathState.customs[qi] = '';
+    }
+    if (oi !== CUSTOM_OPT && pathOwnBoxes && pathOwnBoxes[qi]) {
+      pathOwnBoxes[qi].setAttribute('data-active', 'false');
+    }
+    updatePathProgress();
+  }
+
+  // 自己寫的欄位變動：非空白就算作答，且自動取代 4 個選項
+  function onCustomInput(qi) {
+    var input = pathCustomInputs[qi];
+    var v = input.value.trim();
+    pathState.customs[qi] = v;
+    var box = pathOwnBoxes[qi];
+    if (box) box.setAttribute('data-active', v ? 'true' : 'false');
+    if (v) {
+      pathState.answers[qi] = CUSTOM_OPT;
+      var btns = pathOptBtns[qi] || [];
+      for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', 'false');
+    } else if (pathState.answers[qi] === CUSTOM_OPT) {
+      pathState.answers[qi] = -1;
+    }
     updatePathProgress();
   }
 
   var pathOptBtns = [];
+  var pathCustomInputs = [];
+  var pathOwnBoxes = [];
 
   function renderPathQuestions(questions) {
     var list = $('pathList');
     list.textContent = '';
     pathOptBtns = [];
+    pathCustomInputs = [];
+    pathOwnBoxes = [];
     questions.forEach(function (q, qi) {
       var card = document.createElement('div');
       card.className = 'path-card anim-pop';
@@ -1933,6 +2016,30 @@
       });
       pathOptBtns.push(btns);
       card.appendChild(wrap);
+
+      // 第 5 個選項：孩子自己寫。填了就取代上面 4 個選項
+      var own = document.createElement('div');
+      own.className = 'path-own';
+      own.setAttribute('data-active', 'false');
+      var ownLabel = document.createElement('span');
+      ownLabel.className = 'path-own-label';
+      ownLabel.textContent = '✏️ 都不適合？我自己寫';
+      var ownInput = document.createElement('input');
+      ownInput.type = 'text';
+      ownInput.className = 'path-own-input';
+      ownInput.maxLength = 60;
+      ownInput.placeholder = ownFrameFor(q.stage);
+      ownInput.setAttribute('aria-label', '第 ' + (qi + 1) + ' 題（' + q.stage + '）自己寫的答案');
+      (function (qi) {
+        ownInput.addEventListener('input', function () { onCustomInput(qi); });
+      })(qi);
+      own.appendChild(ownLabel);
+      own.appendChild(ownInput);
+      card.appendChild(own);
+
+      pathCustomInputs.push(ownInput);
+      pathOwnBoxes.push(own);
+
       list.appendChild(card);
     });
   }
@@ -1950,6 +2057,7 @@
     pathState.kind = mode.kind;
     pathState.questions = [];
     pathState.answers = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
+    pathState.customs = ['', '', '', '', '', '', '', '', '', ''];
     clearError('pathError');
     var badge = $('pathTopicBadge');
     if (badge) badge.textContent = (mode.kind === 'argument' ? '📌 議題：' : '📌 主題：') + topic;
@@ -1976,8 +2084,7 @@
     var lines = ['【練習主題】' + (pathState.topic || '（自由發揮）'), '',
       isArg ? '【孩子完成的說理文寫作路徑選擇】' : '【孩子完成的 108 課綱寫作路徑選擇】'];
     pathState.questions.forEach(function (q, i) {
-      var oi = pathState.answers[i];
-      lines.push((i + 1) + '. ' + q.stage + '（' + q.question + '）：' + (oi >= 0 ? q.options[oi] : ''));
+      lines.push((i + 1) + '. ' + q.stage + '（' + q.question + '）：' + (answerTextFor(i) || '（未選擇）'));
     });
     return callGroq(composePromptForKind(pathState.kind), lines.join('\n')).then(function (raw) {
       var article = fixTypos(normalizePathEssay(extractJson(raw)), []);
@@ -2000,8 +2107,12 @@
     ul.textContent = '';
     pathState.questions.forEach(function (q, i) {
       var li = document.createElement('li');
-      var oi = pathState.answers[i];
-      li.textContent = q.stage + '：' + (oi >= 0 ? q.options[oi] : '（未選擇）');
+      var txt = answerTextFor(i);
+      if (pathState.answers[i] === CUSTOM_OPT && txt) {
+        li.textContent = q.stage + '：✏️ ' + txt;
+      } else {
+        li.textContent = q.stage + '：' + (txt || '（未選擇）');
+      }
       ul.appendChild(li);
     });
     $('pathMeta').textContent = (isArg ? '說理文主題：' : '練習主題：') + (pathState.topic || '自由練習')
@@ -2009,7 +2120,7 @@
   }
 
   function resetPath() {
-    pathState = { topic: '', kind: currentMode().kind, questions: [], answers: [] };
+    pathState = { topic: '', kind: currentMode().kind, questions: [], answers: [], customs: [] };
     var l = $('pathList'); if (l) l.textContent = '';
     var e = $('pathEssay'); if (e) e.textContent = '';
     var w = $('pathWordNote'); if (w) w.textContent = '';
