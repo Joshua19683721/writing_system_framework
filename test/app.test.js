@@ -831,6 +831,209 @@ async function boot(responses, keyValue, opts) {
     ok('\u554f\u984c2 \u56de\u7b54\u6846\u4e5f\u80fd\u8a9e\u97f3\u8f38\u5165', env.get('q2').value.indexOf('因為教練提醒大家換位置') !== -1, env.get('q2').value);
     eq('\u56de\u7b54\u4e8c\u4e5f\u5df2\u66ab\u5b58', env.store.get('wsm.a-q2'), env.get('q2').value);
   }
+  const STAGE10 = ['人物','時間','地點','起因','五感','心情','轉折','行動','結果','感想'];
+  const Q10 = STAGE10.map(function (s, i) {
+    return { id: 'g' + (i + 1), stage: s, question_text: '第' + (i + 1) + '題：' + s + '？',
+      options: ['選項A' + (i + 1), '選項B' + (i + 1), '選項C' + (i + 1), '選項D' + (i + 1)] };
+  });
+  const pickAll = function (env, idx) {
+    const cards = env.get('pathList').children;
+    for (let i = 0; i < cards.length; i++) cards[i].children[1].children[idx].fire('click');
+  };
+  const stageOf = function (card) { return card.children[0].children[1].textContent; };
+  const optsOf = function (card) { return card.children[1].children; };
+
+  console.log('\n== 27. 108 課綱引導寫作：隨機主題 → 10 題 → 4 選 1 → 合成文章 ==');
+  {
+    const ESSAY = '第一段：事情的開始。\n\n第二段：經過與轉折。\n\n第三段：結果與感想。';
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: ESSAY })) }
+    ], 'gsk_k');
+    const env = r.env;
+
+    env.get('randomTopicBtn').fire('click');
+    const topic = env.store.get('wsm.customTopic');
+    ok('隨機抽到一個主題', !!topic, String(topic));
+
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+
+    ok('引導區顯示', !env.get('pathSection').classList.contains('hidden'));
+    ok('步驟一已隱藏', env.get('step1').classList.contains('hidden'));
+    ok('徽章帶出題目', env.get('pathTopicBadge').textContent.indexOf(topic) !== -1, env.get('pathTopicBadge').textContent);
+    eq('剛好 10 張題目卡', env.get('pathList').children.length, 10);
+    eq('進度起點 0 / 10', env.get('pathProgress').textContent, '已回答 0 / 10');
+    ok('還沒選完不能合成', env.get('pathComposeBtn').disabled === true);
+    eq('只送出 1 次請求（出題）', r.calls.length, 1);
+
+    let fourOpt = true, orderOk = true;
+    for (let i = 0; i < 10; i++) {
+      const card = env.get('pathList').children[i];
+      if (optsOf(card).length !== 4) fourOpt = false;
+      if (stageOf(card) !== STAGE10[i]) orderOk = false;
+    }
+    ok('每一題都是 4 選 1', fourOpt);
+    ok('依 108 課綱順序：人物→時間→地點→起因→五感→心情→轉折→行動→結果→感想', orderOk);
+
+    const g1 = JSON.parse(r.calls[0].opts.body);
+    ok('出題 prompt 講明 108 課綱', g1.messages[0].content.indexOf('108') !== -1);
+    ok('出題 prompt 要求剛好 4 個選項', g1.messages[0].content.indexOf('剛好 4 個選項') !== -1);
+    ok('出題 prompt 要求共 10 題', g1.messages[0].content.indexOf('10 個') !== -1);
+    ok('user 帶入隨機主題', g1.messages[1].content.indexOf(topic) !== -1, g1.messages[1].content);
+    ok('啟用 json_object', g1.response_format && g1.response_format.type === 'json_object');
+
+    pickAll(env, 2);
+    eq('進度更新為 10 / 10', env.get('pathProgress').textContent, '已回答 10 / 10');
+    ok('選完即可合成', env.get('pathComposeBtn').disabled === false);
+    const cards = env.get('pathList').children;
+    ok('被選項標記為已選', optsOf(cards[3])[2].getAttribute('aria-pressed') === 'true');
+    ok('同題其他選項取消', optsOf(cards[3])[0].getAttribute('aria-pressed') === 'false');
+
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathResult').classList.contains('hidden') === false);
+
+    ok('成果區顯示', !env.get('pathResult').classList.contains('hidden'));
+    ok('引導題目區已隱藏', env.get('pathSection').classList.contains('hidden'));
+    eq('文章內容正確', env.get('pathEssay').textContent, ESSAY);
+    eq('摘要列出 10 個選擇', env.get('pathSummary').children.length, 10);
+    ok('摘要帶出實際選項', env.get('pathSummary').children[2].textContent.indexOf('選項C3') !== -1, env.get('pathSummary').children[2].textContent);
+    ok('字數提示出現', env.get('pathWordNote').textContent.indexOf('全文約') !== -1);
+    ok('列印資訊含主題', env.get('pathMeta').textContent.indexOf(topic) !== -1, env.get('pathMeta').textContent);
+    eq('全程 2 次請求（出題＋合成）', r.calls.length, 2);
+
+    const g2 = JSON.parse(r.calls[1].opts.body);
+    ok('合成 prompt 帶入 10 個選擇', (g2.messages[1].content.match(/選項C/g) || []).length === 10);
+    ok('合成 prompt 帶入主題', g2.messages[1].content.indexOf(topic) !== -1);
+    ok('合成 prompt 列出全部 10 題階段', STAGE10.every(s => g2.messages[1].content.indexOf(s) !== -1));
+    ok('合成 system prompt 要求 final_article', g2.messages[0].content.indexOf('final_article') !== -1);
+    ok('合成 system prompt 規定依 108 課綱結構', g2.messages[0].content.indexOf('108 課綱') !== -1);
+  }
+
+  console.log('\n== 28. 出題數量／選項缺漏時自動補滿 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({
+        questions: [
+          { stage: '人物', question_text: '模型回的第 1 題', options: ['甲', '乙', '丙', '丁'] },
+          { stage: '時間', question_text: '模型回的第 2 題', options: ['甲', '乙'] }
+        ]
+      })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+
+    const cards = env.get('pathList').children;
+    eq('仍補滿 10 題', cards.length, 10);
+    eq('保留模型回的第 1 題', cards[0].children[0].children[2].textContent, '模型回的第 1 題');
+    eq('只有 2 個選項也被補成 4 個', optsOf(cards[1]).length, 4);
+    ok('補上的選項不重複', new Set(optsOf(cards[1]).map(b => b.textContent)).size === 4,
+       JSON.stringify(optsOf(cards[1]).map(b => b.textContent)));
+    let allFour = true, tailOk = true;
+    for (let i = 0; i < cards.length; i++) if (optsOf(cards[i]).length !== 4) allFour = false;
+    for (let i = 2; i < cards.length; i++) if (stageOf(cards[i]) !== STAGE10[i]) tailOk = false;
+    ok('全部題目都有 4 個選項', allFour);
+    ok('不足的題目以 108 課綱階段補齊', tailOk,
+       cards.map(c => stageOf(c)).join('>'));
+    ok('最後一題是「感想」', stageOf(cards[9]) === '感想', stageOf(cards[9]));
+  }
+
+  console.log('\n== 29. 出題失敗時的降級與保底 ==');
+  {
+    const r1 = await boot([
+      { status: 200, body: groqBody('這不是 JSON，只是一句話') }
+    ], 'gsk_k');
+    const e1 = r1.env;
+    e1.get('randomTopicBtn').fire('click');
+    e1.get('startPathBtn').fire('click');
+    await waitFor(() => e1.get('pathError').children.length > 0);
+    ok('壞回應時題目區不會開啟', e1.get('pathSection').classList.contains('hidden'));
+    ok('顯示錯誤訊息', e1.get('pathError').children[0].children[0].textContent.indexOf('😵') === 0,
+       e1.get('pathError').children[0].children[0].textContent);
+    ok('提供「再試一次」按鈕', e1.get('pathError').children[0].children[1].textContent.indexOf('再試一次') !== -1);
+    ok('載入遮罩已關閉（不會卡住）', e1.get('loadingOverlay').classList.contains('hidden'));
+    eq('壞回應不無限重試', r1.calls.length, 1);
+  }
+  {
+    const r2 = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: [] })) }
+    ], 'gsk_k');
+    const e2 = r2.env;
+    e2.get('randomTopicBtn').fire('click');
+    e2.get('startPathBtn').fire('click');
+    await waitFor(() => e2.get('pathSection').classList.contains('hidden') === false);
+    eq('沒有題目時補滿 10 題', e2.get('pathList').children.length, 10);
+    ok('全數走 108 課綱保底階段',
+       STAGE10.every((s, i) => stageOf(e2.get('pathList').children[i]) === s),
+       e2.get('pathList').children.map(c => stageOf(c)).join('>'));
+    ok('保底題目也有 4 個選項',
+       e2.get('pathList').children.every(c => optsOf(c).length === 4));
+    eq('保底題目仍可作答', e2.get('pathProgress').textContent, '已回答 0 / 10');
+  }
+
+  console.log('\n== 30. 沒選完不得合成 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+
+    const cards = env.get('pathList').children;
+    for (let i = 0; i < 9; i++) optsOf(cards[i])[0].fire('click');
+    eq('只選了 9 題', env.get('pathProgress').textContent, '已回答 9 / 10');
+    ok('未選完時按鈕維持停用', env.get('pathComposeBtn').disabled === true);
+    env.get('pathComposeBtn').disabled = false; // 繞過 UI 強制觸發
+    env.get('pathComposeBtn').fire('click');
+    ok('不足 10 題時不發請求', r.calls.length === 1, 'calls=' + r.calls.length);
+    ok('不會跳出成果區', env.get('pathResult').classList.contains('hidden'));
+  }
+
+  console.log('\n== 31. 未選主題時不啟動引導 ==');
+  {
+    const r = await boot([{ status: 200, body: groqBody('{}') }], 'gsk_k');
+    const env = r.env;
+    env.get('startPathBtn').fire('click');
+    ok('沒有主題就不發請求', r.calls.length === 0, 'calls=' + r.calls.length);
+    ok('引導區保持隱藏', env.get('pathSection').classList.contains('hidden'));
+  }
+
+  console.log('\n== 32. 回去改選擇後可重新合成 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '第一版文章。' })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '第二版文章。' })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 1);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathResult').classList.contains('hidden') === false);
+    eq('第一次合成的文章', env.get('pathEssay').textContent, '第一版文章。');
+
+    env.get('pathEditBtn').fire('click');
+    ok('回到題目區', env.get('pathSection').classList.contains('hidden') === false);
+    ok('成果區收起', env.get('pathResult').classList.contains('hidden'));
+    const cards = env.get('pathList').children;
+    ok('先前的選擇仍保留', optsOf(cards[0])[1].getAttribute('aria-pressed') === 'true');
+
+    optsOf(cards[0])[3].fire('click');
+    ok('改選後舊選項取消', optsOf(cards[0])[1].getAttribute('aria-pressed') === 'false');
+    ok('改選後新選項選中', optsOf(cards[0])[3].getAttribute('aria-pressed') === 'true');
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathEssay').textContent === '第二版文章。');
+    eq('重新合成成功', env.get('pathEssay').textContent, '第二版文章。');
+    const g2 = JSON.parse(r.calls[2].opts.body);
+    ok('第二次合成帶入新選擇', g2.messages[1].content.indexOf('選項D1') !== -1);
+  }
+
   console.log('\n' + '='.repeat(46));
   console.log('  PASS ' + pass + ' / FAIL ' + fail);
   console.log('='.repeat(46));

@@ -26,14 +26,30 @@
   .topic-chip[aria-pressed="true"] { background:#4f46e5; color:#fff; border-color:#4f46e5; box-shadow:0 6px 18px -6px rgba(79,70,229,.7); }
   #rawText { line-height: 1.9; }
   .writing { line-height: 2.05; letter-spacing: .01em; }
+
+  /* 108 課綱引導寫作路徑 */
+  .path-card { background:#fff; border:2px solid #e9d5ff; border-radius:1rem; padding:1rem; }
+  .path-head { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.75rem; }
+  .path-num { flex:none; width:1.75rem; height:1.75rem; border-radius:9999px; background:#7c3aed; color:#fff;
+    font-weight:900; font-size:.85rem; display:flex; align-items:center; justify-content:center; }
+  .path-stage { flex:none; background:#f3e8ff; color:#6b21a8; font-weight:900; font-size:.75rem;
+    padding:.15rem .6rem; border-radius:9999px; }
+  .path-question { font-weight:900; color:#3b0764; }
+  .path-options { display:grid; gap:.5rem; grid-template-columns:1fr; }
+  @media (min-width:640px) { .path-options { grid-template-columns:1fr 1fr; } }
+  .path-opt { text-align:left; border:2px solid #e9d5ff; border-radius:.75rem; padding:.6rem .75rem;
+    font-weight:700; color:#4b5563; background:#fff; transition:border-color .15s, background .15s; }
+  .path-opt:hover { border-color:#a855f7; }
+  .path-opt[aria-pressed="true"] { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+
   @media print {
     body { background:#fff !important; }
     .no-print { display: none !important; }
     body * { visibility: hidden !important; }
-    #printArea, #printArea * { visibility: visible !important; }
-    #printArea { position: absolute; left:0; top:0; width:100%; }
-    #printArea .print-plain { box-shadow:none !important; }
-    #printMeta { display:block !important; }
+    #printArea, #printArea *, #guidedPrintArea, #guidedPrintArea * { visibility: visible !important; }
+    #printArea, #guidedPrintArea { position: absolute; left:0; top:0; width:100%; }
+    #printArea .print-plain, #guidedPrintArea .print-plain { box-shadow:none !important; }
+    #printMeta, #guidedMeta { display:block !important; }
   }
 </style>
 </head>
@@ -110,8 +126,50 @@
       <button type="button" id="clearBtn" class="bg-white text-slate-600 text-lg font-black py-4 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition">🧹 清除重打</button>
       <button type="button" id="toNode1Btn" class="sm:col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🚀 送出，進行思辨提問</button>
     </div>
+    <button type="button" id="startPathBtn" class="w-full bg-purple-600 hover:bg-purple-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🧭 108 課綱引導寫作（選好主題 → 10 題・4 選 1）</button>
     <div id="step1Error"></div>
     <p id="speechUnsupported" class="hidden text-sm text-amber-700 bg-amber-50 border-2 border-amber-200 rounded-xl p-3 font-bold"></p>
+  </section>
+
+  <section id="pathSection" class="hidden space-y-5 bg-purple-50 p-5 md:p-6 rounded-3xl border-2 border-purple-200 anim-fade">
+    <div class="flex items-start gap-3">
+      <span class="text-3xl anim-floaty">🧭</span>
+      <div class="flex-1">
+        <h2 class="text-lg sm:text-xl font-black text-purple-900">108 課綱引導寫作路徑</h2>
+        <p class="text-purple-800 font-bold mt-0.5">依序回答 10 個問題（每題 4 選 1），導師會把你的 10 個選擇寫成一篇文章。</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <span id="pathTopicBadge" class="inline-block bg-purple-100 text-purple-800 text-sm font-bold px-3 py-1 rounded-full"></span>
+      <span id="pathProgress" class="text-sm font-black text-purple-700">已回答 0 / 10</span>
+    </div>
+    <div id="pathError"></div>
+    <div id="pathList" class="space-y-4"></div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      <button type="button" id="pathBackBtn" class="bg-white text-slate-700 text-lg font-black py-4 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition">⬅️ 回去選主題</button>
+      <button type="button" id="pathComposeBtn" class="bg-purple-600 hover:bg-purple-700 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg" disabled>✨ 把 10 個選擇寫成一篇文章</button>
+    </div>
+  </section>
+
+  <section id="pathResult" class="hidden space-y-5 bg-purple-50 p-5 md:p-6 rounded-3xl border-2 border-purple-200 anim-fade">
+    <div id="pathPrintArea" class="space-y-5">
+      <p id="pathMeta" class="hidden text-center text-sm text-slate-600 mb-2"></p>
+      <div class="bg-white border-2 border-purple-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
+        <h2 class="text-xl sm:text-2xl font-black text-purple-900">📝 你的引導式作文</h2>
+        <div id="pathEssay" class="writing bg-purple-50/50 border border-purple-100 rounded-2xl p-5 text-lg text-slate-800 whitespace-pre-wrap"></div>
+        <p id="pathWordNote" class="text-sm font-bold text-slate-500"></p>
+      </div>
+      <div class="bg-white border-2 border-purple-100 rounded-3xl p-5 md:p-6 space-y-2 print-plain">
+        <h3 class="font-black text-base sm:text-lg text-purple-800">✅ 你完成的 108 課綱路徑（10 個選擇）</h3>
+        <ul id="pathSummary" class="list-disc list-inside text-slate-700 space-y-1 font-medium leading-relaxed"></ul>
+      </div>
+    </div>
+    <div class="no-print grid gap-3 sm:grid-cols-2">
+      <button type="button" id="pathCopyBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">📋 複製文章</button>
+      <button type="button" id="pathPrintBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">🖨️ 列印 / 存成 PDF</button>
+      <button type="button" id="pathEditBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">⬅️ 回去改選擇</button>
+      <button type="button" id="pathRestartBtn" class="bg-slate-700 hover:bg-slate-800 text-white font-black py-3 rounded-2xl transition">🔄 重新練習另一篇</button>
+    </div>
   </section>
 
   <section id="step2" class="hidden space-y-6 bg-emerald-50 p-5 md:p-6 rounded-3xl border-2 border-emerald-200 anim-fade">
@@ -295,6 +353,55 @@
     '【輸出規則】只輸出合法 JSON，不要加任何解釋文字或 Markdown 符號。'
   ].join('\n');
 
+  var PROMPT_PATH_QUESTIONS = [
+    '你是一位熟悉「十二年國教 108 課綱」素養導向教學的國小國文老師。',
+    '孩子的練習主題是下方【練習主題】的內容。',
+    '',
+    '【任務】請依 108 課綱的記敘文寫作路徑，設計「剛好 10 個」引導問題，帶孩子一步步把這篇作文寫出來。',
+    '',
+    '【這 10 題的順序與重點】（務必依序涵蓋這 10 個環節）：',
+    '1 人物、2 時間、3 地點、4 起因、5 五感細節、6 心情、7 轉折、8 行動、9 結果、10 感想反思。',
+    '',
+    '【每一題的選項規則】：',
+    '1. 每一題都必須提供「剛好 4 個選項」（4 選 1，讓孩子選一個）。',
+    '2. 選項要具體、有畫面感，符合國小四年級程度，並貼近這個主題。',
+    '3. 選項不要全是空泛詞（例如「很好」「普通」），要能幫孩子填進具體內容。',
+    '4. 問題和選項都要短，適合 10 歲小孩閱讀。',
+    '',
+    '【語言與格式規範】：',
+    '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
+    '2. 只輸出合法 JSON，不要加任何解釋文字、註解或 Markdown 符號。',
+    '',
+    '【輸出 JSON 格式】（下面只示範前兩題，實際一定要回 g1～g10 共 10 題，每題剛好 4 個 options）：',
+    '{',
+    '  "questions": [',
+    '    { "id": "g1", "stage": "人物", "question_text": "故事裡有哪兩個人？", "options": ["我和好朋友", "我和家人", "我和同學", "只有我自己"] },',
+    '    { "id": "g2", "stage": "時間", "question_text": "這件事發生在什麼時候？", "options": ["早上", "下午", "晚上", "放假的時候"] }',
+    '  ]',
+    '}'
+  ].join('\n');
+
+  var PROMPT_PATH_COMPOSE = [
+    '你是一位國小國文寫作老師。孩子已經完成「108 課綱引導寫作路徑」的 10 個選擇題，',
+    '請把孩子的這些選擇「組合」成一篇通順、有起承轉合的引導式記敘文。',
+    '',
+    '【原則】：',
+    '1. 依 108 課綱記敘文結構組織：開頭 → 起因 → 經過（含五感與心情）→ 轉折 → 結果 → 感想反思。',
+    '2. 只能使用孩子選到的內容，不要新增與孩子選擇無關的新事件或新人物。',
+    '3. 把孩子零散的選擇串成自然的句子，補上合理的連接詞與場景細節，但不可背離孩子的選擇。',
+    '4. 保留孩子的口吻，語氣自然，適合國小四年級。',
+    '5. final_article 段落之間用換行分隔，不要加小標題、序號或項目符號。',
+    '',
+    '【語言與格式規範】：',
+    '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
+    '2. 只輸出合法 JSON，不要加任何解釋文字或 Markdown 符號。',
+    '',
+    '【輸出 JSON 格式】：',
+    '{',
+    '  "final_article": "把 10 個選擇組合而成的完整引導式記敘文，段落以換行分隔..."',
+    '}'
+  ].join('\n');
+
   /* ============================================================
      2. 設定
      ============================================================ */
@@ -342,6 +449,20 @@
       '最關鍵的那一步是什麼？為什麼它那麼重要？',
       '經過這件事，你學到了什麼？下次遇到會怎麼做？'
     ]
+  ];
+
+  // 108 課綱記敘文寫作路徑的 10 個環節（模型沒給足時的備援，保證問得出來）
+  var PATH_STAGES = [
+    { stage: '人物', question: '故事裡有哪些人一起參與這件事？', options: ['只有我自己', '我和好朋友', '我和家人', '我和同學或隊友'] },
+    { stage: '時間', question: '這件事發生在什麼時候？', options: ['上課的時候', '下課或午休', '放學以後', '週末或假日'] },
+    { stage: '地點', question: '這件事發生在哪裡？', options: ['教室裡', '操場或走廊', '家裡', '外面（公園、商店、比賽場地）'] },
+    { stage: '起因', question: '事情是怎麼開始的？', options: ['有人提出了一個想法', '突然發生了一個小意外', '比賽或活動開始了', '本來很平常，後來有了變化'] },
+    { stage: '五感', question: '當時你看到或聽到什麼？', options: ['聽到熱鬧的聲音', '看到關鍵的那一幕', '聞到特別的味道', '安靜到只聽見自己的心跳'] },
+    { stage: '心情', question: '那一刻你心裡的感覺是什麼？', options: ['緊張又期待', '開心又興奮', '擔心或害怕', '又氣又委屈'] },
+    { stage: '轉折', question: '中間發生了什麼變化？', options: ['情況突然變得不一樣', '有人說了一句關鍵的話', '我改變了主意', '出現了意想不到的結果'] },
+    { stage: '行動', question: '接著你做了什麼？', options: ['我趕快想辦法解決', '我鼓起勇氣試一次', '我主動開口幫忙或道歉', '我堅持下去沒有放棄'] },
+    { stage: '結果', question: '最後怎麼了？', options: ['事情順利完成', '雖然不完美但學到很多', '結果出乎意料', '大家開心地結束'] },
+    { stage: '感想', question: '這件事之後，你有什麼感想？', options: ['我學會了堅持', '我更懂得體諒別人', '下次我會做得更好', '我很珍惜這次的經驗'] }
   ];
 
   // 題庫裡已內建提示；這裡補上四個固定主題的寫法提示
@@ -1192,10 +1313,12 @@
     els.charCount.textContent = String(els.rawText.value.trim().length);
   }
 
-  function showStep(n) {
-    ['step1', 'step2', 'step3'].forEach(function (id, i) {
-      var el = $(id);
-      var on = (i + 1) === n;
+  var ALL_PANELS = ['step1', 'step2', 'step3', 'pathSection', 'pathResult'];
+
+  function showPanel(id) {
+    ALL_PANELS.forEach(function (pid) {
+      var el = $(pid);
+      var on = (pid === id);
       el.classList.toggle('hidden', !on);
       if (on) {
         el.classList.remove('anim-fade');
@@ -1204,6 +1327,10 @@
       }
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showStep(n) {
+    showPanel(['step1', 'step2', 'step3'][n - 1]);
   }
 
   function fillList(ul, items, emptyText) {
@@ -1496,6 +1623,192 @@
   }
 
   /* ============================================================
+     7.6 108 課綱引導寫作路徑（10 題・4 選 1）
+
+     選好主題後，導師依 108 課綱生成 10 個引導問題（每題 4 選 1），
+     孩子只要選答案，最後把 10 個選擇組合成一篇引導式記敘文。
+     模型沒給足時，用內建 PATH_STAGES 保證問得出來。
+     ============================================================ */
+
+  var GUIDED_COUNT = 10;
+
+  var pathState = { topic: '', questions: [], answers: [] };
+
+  function buildGuidedFallback() {
+    return PATH_STAGES.map(function (s) {
+      return { stage: s.stage, question: s.question, options: s.options.slice(0, 4) };
+    });
+  }
+
+  function normalizePathQuestions(data, topic) {
+    var list = null;
+    if (data && Array.isArray(data.questions)) list = data.questions;
+    else if (Array.isArray(data)) list = data;
+    var fb = buildGuidedFallback();
+    var out = [];
+    if (list) {
+      for (var i = 0; i < list.length && out.length < GUIDED_COUNT; i++) {
+        var q = list[i];
+        if (!q || typeof q !== 'object') continue;
+        var slot = fb[Math.min(out.length, fb.length - 1)];
+        var stage = firstString(q.stage, q.step, q.focus, q.tag) || slot.stage;
+        var text = firstString(q.question_text, q.question, q.text, q.title) || slot.question;
+        var rawOpts = Array.isArray(q.options) ? q.options
+          : (Array.isArray(q.choices) ? q.choices : (Array.isArray(q.option4) ? q.option4 : null));
+        var opts = [];
+        if (rawOpts) {
+          for (var j = 0; j < rawOpts.length && opts.length < 4; j++) {
+            var s = typeof rawOpts[j] === 'string' ? toTraditional(rawOpts[j]).trim() : firstString(rawOpts[j]);
+            if (s && opts.indexOf(s) === -1) opts.push(s);
+          }
+        }
+        for (var k = 0; opts.length < 4 && k < slot.options.length; k++) {
+          if (opts.indexOf(slot.options[k]) === -1) opts.push(slot.options[k]);
+        }
+        out.push({ id: 'g' + (out.length + 1), stage: stage, question: text, options: opts });
+      }
+    }
+    while (out.length < GUIDED_COUNT) {
+      var f = fb[out.length];
+      out.push({ id: 'g' + (out.length + 1), stage: f.stage, question: f.question, options: f.options.slice() });
+    }
+    return out;
+  }
+
+  function normalizePathEssay(data) {
+    var article = data ? firstString(data.final_article, data.finalArticle, data.article, data.draft) : '';
+    if (!article) throw AppError('這次沒有拿到完整的文章，請按「再試一次」重新產生。', 'bad-shape', true);
+    return article;
+  }
+
+  function updatePathProgress() {
+    var done = 0;
+    for (var i = 0; i < pathState.answers.length; i++) if (pathState.answers[i] >= 0) done++;
+    var p = $('pathProgress');
+    if (p) p.textContent = '已回答 ' + done + ' / ' + GUIDED_COUNT;
+    var btn = $('pathComposeBtn');
+    if (btn) btn.disabled = done < GUIDED_COUNT;
+    return done;
+  }
+
+  function selectPathOption(qi, oi) {
+    pathState.answers[qi] = oi;
+    var btns = pathOptBtns[qi] || [];
+    for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', i === oi ? 'true' : 'false');
+    updatePathProgress();
+  }
+
+  var pathOptBtns = [];
+
+  function renderPathQuestions(questions) {
+    var list = $('pathList');
+    list.textContent = '';
+    pathOptBtns = [];
+    questions.forEach(function (q, qi) {
+      var card = document.createElement('div');
+      card.className = 'path-card anim-pop';
+      var head = document.createElement('div');
+      head.className = 'path-head';
+      var num = document.createElement('span');
+      num.className = 'path-num';
+      num.textContent = String(qi + 1);
+      var stage = document.createElement('span');
+      stage.className = 'path-stage';
+      stage.textContent = q.stage;
+      var qt = document.createElement('span');
+      qt.className = 'path-question';
+      qt.textContent = q.question;
+      head.appendChild(num); head.appendChild(stage); head.appendChild(qt);
+      card.appendChild(head);
+      var wrap = document.createElement('div');
+      wrap.className = 'path-options';
+      wrap.setAttribute('role', 'radiogroup');
+      var btns = [];
+      q.options.forEach(function (optText, oi) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'path-opt';
+        b.textContent = optText;
+        b.setAttribute('aria-pressed', 'false');
+        (function (qi, oi) {
+          b.addEventListener('click', function () { selectPathOption(qi, oi); });
+        })(qi, oi);
+        wrap.appendChild(b);
+        btns.push(b);
+      });
+      pathOptBtns.push(btns);
+      card.appendChild(wrap);
+      list.appendChild(card);
+    });
+  }
+
+  function startPath() {
+    var topic = currentTopic();
+    if (!topic) { toast('先選一個主題（可以按 🎲 隨機抽題），再開始引導寫作。', 'err'); return Promise.resolve(); }
+    pathState.topic = topic;
+    pathState.questions = [];
+    pathState.answers = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1];
+    clearError('pathError');
+    var badge = $('pathTopicBadge');
+    if (badge) badge.textContent = '📌 主題：' + topic;
+    showLoading('魔法導師正在為你安排 108 課綱的 10 個問題…');
+    return callGroq(PROMPT_PATH_QUESTIONS, '【練習主題】' + topic).then(function (raw) {
+      pathState.questions = normalizePathQuestions(extractJson(raw), topic);
+      renderPathQuestions(pathState.questions);
+      updatePathProgress();
+      showPanel('pathSection');
+    }).catch(function (e) {
+      handleError(e, 'pathError', startPath);
+    }).finally(function () { hideLoading(); });
+  }
+
+  function runPathCompose() {
+    var done = updatePathProgress();
+    if (done < GUIDED_COUNT) { toast('還有 ' + (GUIDED_COUNT - done) + ' 題沒選完，全部選完才能寫成文章喔。', 'err'); return Promise.resolve(); }
+    clearError('pathError');
+    showLoading('魔法導師正在把你的 10 個選擇寫成一篇文章…');
+    var lines = ['【練習主題】' + (pathState.topic || '（自由發揮）'), '', '【孩子完成的 108 課綱寫作路徑選擇】'];
+    pathState.questions.forEach(function (q, i) {
+      var oi = pathState.answers[i];
+      lines.push((i + 1) + '. ' + q.stage + '（' + q.question + '）：' + (oi >= 0 ? q.options[oi] : ''));
+    });
+    return callGroq(PROMPT_PATH_COMPOSE, lines.join('\n')).then(function (raw) {
+      var article = fixTypos(normalizePathEssay(extractJson(raw)), []);
+      renderPathEssay(article);
+      showPanel('pathResult');
+    }).catch(function (e) {
+      handleError(e, 'pathError', runPathCompose);
+    }).finally(function () { hideLoading(); });
+  }
+
+  function renderPathEssay(article) {
+    $('pathEssay').textContent = article;
+    var n = article.replace(/\s+/g, '').length;
+    $('pathWordNote').textContent = '全文約 ' + n + ' 字'
+      + (n >= 300 && n <= 600 ? ' ✅ 長度很適合小學記敘文！' : '（小學記敘文大約 300～600 字，可以再想想）');
+    var ul = $('pathSummary');
+    ul.textContent = '';
+    pathState.questions.forEach(function (q, i) {
+      var li = document.createElement('li');
+      var oi = pathState.answers[i];
+      li.textContent = q.stage + '：' + (oi >= 0 ? q.options[oi] : '（未選擇）');
+      ul.appendChild(li);
+    });
+    $('pathMeta').textContent = '練習主題：' + (pathState.topic || '自由練習') + '　｜　' + new Date().toLocaleDateString('zh-TW');
+  }
+
+  function resetPath() {
+    pathState = { topic: '', questions: [], answers: [] };
+    var l = $('pathList'); if (l) l.textContent = '';
+    var e = $('pathEssay'); if (e) e.textContent = '';
+    var w = $('pathWordNote'); if (w) w.textContent = '';
+    var s = $('pathSummary'); if (s) s.textContent = '';
+    var m = $('pathMeta'); if (m) m.textContent = '';
+    clearError('pathError');
+    updatePathProgress();
+  }
+
+  /* ============================================================
      8. 語音輸入
      ============================================================ */
 
@@ -1734,6 +2047,26 @@
     $('toNode1Btn').addEventListener('click', runNode1);
     $('toNode23Btn').addEventListener('click', runNode23);
 
+    $('startPathBtn').addEventListener('click', startPath);
+    $('pathComposeBtn').addEventListener('click', runPathCompose);
+    $('pathBackBtn').addEventListener('click', function () { showPanel('step1'); });
+    $('pathEditBtn').addEventListener('click', function () { showPanel('pathSection'); });
+    $('pathRestartBtn').addEventListener('click', function () {
+      if (!window.confirm('確定要重新開始嗎？\n（剛才的內容會被清空，這個動作不能復原）')) return;
+      restart();
+    });
+    $('pathCopyBtn').addEventListener('click', function () {
+      var text = $('pathEssay').textContent;
+      if (!text) { toast('還沒有文章可以複製。', 'err'); return; }
+      var done = function () { toast('文章已複製到剪貼簿！', 'ok'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
+    $('pathPrintBtn').addEventListener('click', function () { window.print(); });
+
     $('regenQuestionsBtn').addEventListener('click', function () {
       if (!window.confirm('要請導師換兩個問題嗎？\n（你剛才寫的回答會被清掉）')) return;
       store.del('a-q1');
@@ -1804,6 +2137,7 @@
     $('node1Praise').textContent = '';
     $('finalDraft').textContent = '';
     $('wordCountNote').textContent = '';
+    resetPath();
     setKeyStatus();
     showStep(1);
     toast('準備好開始新的一篇了！', 'ok');

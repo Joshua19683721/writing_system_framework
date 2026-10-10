@@ -15,6 +15,9 @@ _appendix.tmp
 Thumbs.db
 desktop.ini
 
+# OpenCode session / loop 狀態（本機專用，不進版控）
+.opencode/
+
 # 編輯器
 .vscode/
 .idea/
