@@ -1098,6 +1098,52 @@ async function boot(responses, keyValue, opts) {
     eq('規格文件沒有損壞字元', badD, 0);
   }
 
+  console.log('\n== 35. 成果頁可直接重新生成文章 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '太短的一版。' })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '長一點的第二版，' + '有更多細節描寫。'.repeat(40) })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathResult').classList.contains('hidden') === false);
+    eq('第一次產出較短', env.get('pathEssay').textContent, '太短的一版。');
+    ok('長度不足時給出提示', env.get('pathWordNote').textContent.indexOf('可以再想想') !== -1,
+       env.get('pathWordNote').textContent);
+
+    // 不改任何選擇，直接重新生成
+    env.get('pathRegenBtn').fire('click');
+    await waitFor(() => env.get('pathEssay').textContent.length > 20);
+    ok('保留原本的 10 個選擇', env.get('pathProgress').textContent === '已回答 10 / 10');
+    ok('重新生成後仍在成果區', !env.get('pathResult').classList.contains('hidden'));
+    ok('新文章已換成較長版本', env.get('pathEssay').textContent.indexOf('第二版') !== -1);
+    ok('長度提示改為適合', env.get('pathWordNote').textContent.indexOf('✅') !== -1,
+       env.get('pathWordNote').textContent);
+    const g2 = JSON.parse(r.calls[2].opts.body);
+    ok('再次帶入 10 個選擇', (g2.messages[1].content.match(/選項A/g) || []).length === 10);
+    eq('總共 3 次請求（出題＋生成×2）', r.calls.length, 3);
+  }
+  {
+    // 選擇未完成時不應從成果頁發出請求
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    const cards = env.get('pathList').children;
+    for (let i = 0; i < 5; i++) optsOf(cards[i])[0].fire('click');
+    env.get('pathRegenBtn').fire('click');
+    ok('選擇未完成時不發請求', r.calls.length === 1, 'calls=' + r.calls.length);
+    ok('會自動回到題目區', env.get('pathSection').classList.contains('hidden') === false);
+  }
+
   console.log('\n' + '='.repeat(46));
   console.log('  PASS ' + pass + ' / FAIL ' + fail);
   console.log('='.repeat(46));

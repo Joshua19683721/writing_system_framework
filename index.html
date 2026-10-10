@@ -167,8 +167,9 @@
     <div class="no-print grid gap-3 sm:grid-cols-2">
       <button type="button" id="pathCopyBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">📋 複製文章</button>
       <button type="button" id="pathPrintBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">🖨️ 列印 / 存成 PDF</button>
+      <button type="button" id="pathRegenBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-2xl transition">🔄 重新寫一次（保留我的選擇）</button>
       <button type="button" id="pathEditBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">⬅️ 回去改選擇</button>
-      <button type="button" id="pathRestartBtn" class="bg-slate-700 hover:bg-slate-800 text-white font-black py-3 rounded-2xl transition">🔄 重新練習另一篇</button>
+      <button type="button" id="pathRestartBtn" class="sm:col-span-2 bg-slate-700 hover:bg-slate-800 text-white font-black py-3 rounded-2xl transition">🔄 重新練習另一篇</button>
     </div>
   </section>
 
@@ -2053,6 +2054,11 @@
 
     $('startPathBtn').addEventListener('click', startPath);
     $('pathComposeBtn').addEventListener('click', runPathCompose);
+    $('pathRegenBtn').addEventListener('click', function () {
+      var done = updatePathProgress();
+      if (done < GUIDED_COUNT) { showPanel('pathSection'); toast('請先完成全部 ' + GUIDED_COUNT + ' 題的選擇。', 'err'); return; }
+      runPathCompose();
+    });
     $('pathBackBtn').addEventListener('click', function () { showPanel('step1'); });
     $('pathEditBtn').addEventListener('click', function () { showPanel('pathSection'); });
     $('pathRestartBtn').addEventListener('click', function () {
