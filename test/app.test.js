@@ -1034,6 +1034,32 @@ async function boot(responses, keyValue, opts) {
     ok('第二次合成帶入新選擇', g2.messages[1].content.indexOf('選項D1') !== -1);
   }
 
+  console.log('\n== 33. 列印樣式涵蓋每一個成果區 ==');
+  {
+    const pi = HTML.indexOf('@media print');
+    const printBlock = pi === -1 ? '' : HTML.slice(pi, HTML.indexOf('</style>'));
+    ok('存在 @media print 區塊', pi !== -1);
+    // 只取選擇器，排除十六進位色碼（#fff / #aabbcc / #aabbccdd）
+    const isHex = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+    const sels = [...new Set(printBlock.match(/#[A-Za-z][\w-]*/g) || [])]
+      .filter(s => !isHex.test(s));
+    const dead = sels.filter(s => HTML.indexOf('id="' + s.slice(1) + '"') === -1);
+    eq('印表 CSS 沒有指向不存在元素的死選擇器', dead.join(', ') || '(無)', '(無)');
+
+    // 每個成果區都必須有印表樣式，否則 body *{visibility:hidden} 會讓它變成空白頁
+    ['printArea', 'pathPrintArea'].forEach(id => {
+      ok('成果區 #' + id + ' 有 visibility:visible 例外', sels.indexOf('#' + id) !== -1);
+    });
+    ['printMeta', 'pathMeta'].forEach(id => {
+      ok('列印資訊 #' + id + ' 有 display:block 例外', sels.indexOf('#' + id) !== -1);
+    });
+    ok('列印時會先隱藏整頁', /body\s*\*\s*\{[^}]*visibility:\s*hidden/.test(printBlock));
+    ok('接著對成果區補回 visibility:visible', /visibility:\s*visible/.test(printBlock));
+    ok('.no-print 在列印時被移除', /\.no-print\s*\{[^}]*display:\s*none/.test(printBlock));
+    ok('兩個成果區都有 .print-plain 去框線',
+       /#printArea \.print-plain/.test(printBlock) && /#pathPrintArea \.print-plain/.test(printBlock));
+  }
+
   console.log('\n' + '='.repeat(46));
   console.log('  PASS ' + pass + ' / FAIL ' + fail);
   console.log('='.repeat(46));
