@@ -841,6 +841,13 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     ok('\u554f\u984c2 \u56de\u7b54\u6846\u4e5f\u80fd\u8a9e\u97f3\u8f38\u5165', env.get('q2').value.indexOf('因為教練提醒大家換位置') !== -1, env.get('q2').value);
     eq('\u56de\u7b54\u4e8c\u4e5f\u5df2\u66ab\u5b58', env.store.get('wsm.a-q2'), env.get('q2').value);
   }
+  const REVIEW_OK = JSON.stringify({
+    items: [
+      { label: '主題明確', ok: true, note: '主角與重點清楚。' },
+      { label: '轉折寫得深', ok: false, note: '轉折只用一句帶過，請補上具體瞬間。' }
+    ],
+    advice: '最需要加強的是轉折處的描寫。'
+  });
   const STAGE10 = ['人物','時間','地點','起因','五感','心情','轉折','行動','結果','感想'];
   const Q10 = STAGE10.map(function (s, i) {
     return { id: 'g' + (i + 1), stage: s, question_text: '第' + (i + 1) + '題：' + s + '？',
@@ -862,7 +869,8 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     const ESSAY = '第一段：事情的開始。\n\n第二段：經過與轉折。\n\n第三段：結果與感想。';
     const r = await boot([
       { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
-      { status: 200, body: groqBody(JSON.stringify({ final_article: ESSAY })) }
+      { status: 200, body: groqBody(JSON.stringify({ final_article: ESSAY })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
     ], 'gsk_k');
     const env = r.env;
 
@@ -914,7 +922,7 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     ok('摘要帶出實際選項', env.get('pathSummary').children[2].textContent.indexOf('選項C3') !== -1, env.get('pathSummary').children[2].textContent);
     ok('字數提示出現', env.get('pathWordNote').textContent.indexOf('全文約') !== -1);
     ok('列印資訊含主題', env.get('pathMeta').textContent.indexOf(topic) !== -1, env.get('pathMeta').textContent);
-    eq('全程 2 次請求（出題＋合成）', r.calls.length, 2);
+    eq('全程 3 次請求（出題＋合成＋體檢）', r.calls.length, 3);
 
     const g2 = JSON.parse(r.calls[1].opts.body);
     ok('合成 prompt 帶入 10 個選擇', (g2.messages[1].content.match(/選項C/g) || []).length === 10);
@@ -1021,7 +1029,9 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     const r = await boot([
       { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
       { status: 200, body: groqBody(JSON.stringify({ final_article: '第一版文章。' })) },
-      { status: 200, body: groqBody(JSON.stringify({ final_article: '第二版文章。' })) }
+      { status: 200, body: groqBody(REVIEW_OK) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '第二版文章。' })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
     ], 'gsk_k');
     const env = r.env;
     env.get('randomTopicBtn').fire('click');
@@ -1044,7 +1054,7 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     env.get('pathComposeBtn').fire('click');
     await waitFor(() => env.get('pathEssay').textContent === '第二版文章。');
     eq('重新合成成功', env.get('pathEssay').textContent, '第二版文章。');
-    const g2 = JSON.parse(r.calls[2].opts.body);
+    const g2 = JSON.parse(r.calls[3].opts.body);
     ok('第二次合成帶入新選擇', g2.messages[1].content.indexOf('選項D1') !== -1);
   }
 
@@ -1125,7 +1135,9 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     const r = await boot([
       { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
       { status: 200, body: groqBody(JSON.stringify({ final_article: '太短的一版。' })) },
-      { status: 200, body: groqBody(JSON.stringify({ final_article: '長一點的第二版，' + '有更多細節描寫。'.repeat(40) })) }
+      { status: 200, body: groqBody(REVIEW_OK) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '長一點的第二版，' + '有更多細節描寫。'.repeat(40) })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
     ], 'gsk_k');
     const env = r.env;
     env.get('randomTopicBtn').fire('click');
@@ -1146,9 +1158,9 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     ok('新文章已換成較長版本', env.get('pathEssay').textContent.indexOf('第二版') !== -1);
     ok('長度提示改為適合', env.get('pathWordNote').textContent.indexOf('✅') !== -1,
        env.get('pathWordNote').textContent);
-    const g2 = JSON.parse(r.calls[2].opts.body);
+    const g2 = JSON.parse(r.calls[3].opts.body);
     ok('再次帶入 10 個選擇', (g2.messages[1].content.match(/選項A/g) || []).length === 10);
-    eq('總共 3 次請求（出題＋生成×2）', r.calls.length, 3);
+    eq('總共 5 次請求（出題＋生成×2＋體檢×2）', r.calls.length, 5);
   }
   {
     // 選擇未完成時不應從成果頁發出請求
@@ -1300,7 +1312,9 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     const r = await boot([
       { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
       { status: 200, body: groqBody(JSON.stringify({ final_article: '用自己寫的內容組成的文章。' })) },
-      { status: 200, body: groqBody(JSON.stringify({ final_article: '第二次合成，含自己寫的內容。' })) }
+      { status: 200, body: groqBody(REVIEW_OK) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '第二次合成，含自己寫的內容。' })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
     ], 'gsk_k');
     const env = r.env;
     env.get('randomTopicBtn').fire('click');
@@ -1376,6 +1390,158 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     const li = env.get('pathSummary').children[0];
     ok('自己寫的 HTML 只顯示為文字', li.children.length === 0 && li.textContent.indexOf('<img') !== -1,
        li.textContent.slice(0, 40));
+  }
+
+  console.log('\n== 41. 產出文章後的體檢表 ==');
+  {
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '轉折寫得很 shallow 的一篇文章。' })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+
+    ok('體檢表已顯示', !env.get('pathReviewCard').classList.contains('hidden'));
+    const list = env.get('pathReviewList').children;
+    eq('記敘文評分有 7 個項目', list.length, 7);
+    const labels = Array.from(list).map(li => li.children[1].children[0].textContent);
+    ok('包含轉折寫得深', labels.join('|').indexOf('轉折寫得深') !== -1);
+    ok('包含句型與用詞有變化', labels.join('|').indexOf('句型與用詞有變化') !== -1);
+    ok('包含五感描寫', labels.join('|').indexOf('五感描寫') !== -1);
+    ok('未提供的項目自動補為未達到', list[1].children[0].textContent === '⚠️', list[1].children[0].textContent);
+    ok('達到項目顯示打勾', list[0].children[0].textContent === '✅', list[0].children[0].textContent);
+    ok('有總評語', env.get('pathReviewAdvice').textContent.indexOf('轉折處') !== -1);
+    ok('有達到項數統計', env.get('pathReviewScore').textContent.indexOf('1 / 7') !== -1,
+       env.get('pathReviewScore').textContent);
+
+    // 體檢用的是專用 prompt，並帶入文章與選擇
+    const g3 = JSON.parse(r.calls[2].opts.body);
+    ok('使用體檢 prompt', g3.messages[0].content.indexOf('體檢表') !== -1);
+    ok('體檢 prompt 帶入文章', g3.messages[1].content.indexOf('shallow') !== -1);
+    ok('體檢 prompt 帶入 10 個選擇', (g3.messages[1].content.match(/選項A/g) || []).length === 10);
+    ok('體檢 prompt 要求逐項評估', g3.messages[0].content.indexOf('依序檢查以下每一項') !== -1);
+    ok('記敘文體檢含轉折深度的標準',
+       g3.messages[0].content.indexOf('轉折前後的對比') !== -1);
+  }
+  {
+    // 說理文用另一套評分項目
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: [] })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '一篇說理文。' })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
+    ], 'gsk_k');
+    const env = r.env;
+    pickMode(env, 2);
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+
+    const labels = Array.from(env.get('pathReviewList').children).map(li => li.children[1].children[0].textContent).join('|');
+    eq('說理文評分有 7 個項目', env.get('pathReviewList').children.length, 7);
+    ok('含論點明確', labels.indexOf('論點明確') !== -1);
+    ok('含正面處理反方', labels.indexOf('正面處理反方') !== -1);
+    ok('含回應有說服力', labels.indexOf('回應有說服力') !== -1);
+    ok('不會誤用記敘文的項目', labels.indexOf('五感描寫') === -1);
+    const g3 = JSON.parse(r.calls[2].opts.body);
+    ok('說理文體檢要求處理反方', g3.messages[0].content.indexOf('對方的質疑') !== -1);
+  }
+  {
+    // 體檢失敗不能影響文章
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '這篇文章必須留下來。' })) },
+      { status: 500, body: { error: { message: 'server error' } } }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathReviewCard').classList.contains('hidden') === false);
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+    ok('體檢失敗時文章仍在', env.get('pathEssay').textContent === '這篇文章必須留下來。');
+    ok('體檢失敗時顯示錯誤訊息', env.get('pathReviewList').children[0].textContent.indexOf('體檢失敗') !== -1,
+       env.get('pathReviewList').children[0].textContent);
+    ok('成果區仍正常顯示', !env.get('pathResult').classList.contains('hidden'));
+  }
+  {
+    // 重新體檢按鈕
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '第一版。' })) },
+      { status: 200, body: groqBody(REVIEW_OK) },
+      { status: 200, body: groqBody(REVIEW_OK) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+    eq('合成與自動體檢共 2 次', r.calls.length, 3);
+    env.get('pathReviewBtn').fire('click');
+    await waitFor(() => env.get('loadingOverlay').classList.contains('hidden'));
+    eq('可再手動體檢一次', r.calls.length, 4);
+    ok('體檢後文章不受影響', env.get('pathEssay').textContent === '第一版。');
+  }
+
+  console.log('\n== 42. 轉折深度與修辭變化的強化 ==');
+  {
+    const grab = function (name) {
+      const i = HTML.indexOf('var ' + name + ' = [');
+      return HTML.slice(i, HTML.indexOf('].join', i));
+    };
+    const pc = grab('PROMPT_PATH_COMPOSE');
+    const ac = grab('PROMPT_ARG_COMPOSE');
+    const stages = HTML.slice(HTML.indexOf('var PATH_STAGES = ['), HTML.indexOf('];', HTML.indexOf('var PATH_STAGES = [')));
+
+    ok('記敘合成要求轉折寫深', pc.indexOf('轉折要寫深') !== -1);
+    ok('轉折需交代怎麼變的', pc.indexOf('怎麼變的') !== -1);
+    ok('轉折需前後對比', pc.indexOf('轉折前後的對比') !== -1);
+    ok('轉折需心理或動作', pc.indexOf('動作') !== -1 && pc.indexOf('心裡的感覺') !== -1);
+    ok('記敘合成要求句型變化', pc.indexOf('句型與用詞要有變化') !== -1);
+    ok('要求長短句交錯', pc.indexOf('長短句交錯') !== -1);
+    ok('要求避免同一個開頭', pc.indexOf('同一個開頭') !== -1);
+    ok('比喻不可濫用', pc.indexOf('不可為了華麗而濫用') !== -1);
+
+    ok('說理合成要求反方寫深', ac.indexOf('反方與回應要寫深') !== -1);
+    ok('說理合成要求句型變化', ac.indexOf('句型與用詞要有變化') !== -1);
+    ok('說理避免通篇同一句型', ac.indexOf('因為⋯⋯所以⋯⋯') !== -1);
+    ok('說理要求節奏', ac.indexOf('說理要有節奏') !== -1);
+
+    // 轉折選項本身帶有追問，逼出具體內容
+    const turn = (stages.match(/\{ stage: '轉折'[\s\S]*?\] \}/) || [''])[0];
+    ok('轉折選項帶追問括號', (turn.match(/（/g) || []).length >= 4, turn);
+    ok('轉折題目要求具體', turn.indexOf('越具體越好') !== -1);
+  }
+
+  console.log('\n== 43. 體檢表評分項目定義 ==');
+  {
+    const start = HTML.indexOf('var REVIEW_RUBRIC = {');
+    const block = HTML.slice(start, HTML.indexOf('};', start));
+    ok('有 buildReviewPrompt 函式', HTML.indexOf('function buildReviewPrompt(kind)') !== -1);
+    ok('依 kind 選擇評分表', HTML.indexOf('REVIEW_RUBRIC[kind] || REVIEW_RUBRIC.narrative') !== -1);
+    const nCount = (block.split('narrative: [')[1] || '').split('argument: [')[0].split('\n')
+      .filter(l => l.trim().startsWith("['")).length;
+    const aCount = (block.split('argument: [')[1] || '').split('\n')
+      .filter(l => l.trim().startsWith("['")).length;
+    eq('記敘文評分項目 7 項', nCount, 7);
+    eq('說理文評分項目 7 項', aCount, 7);
+    ok('兩套項目不重複',
+       !block.split('narrative: [')[1].split('argument: [')[0].includes("'正面處理反方'"));
+    ok('體檢 prompt 要求具體說明', HTML.indexOf('note 要具體指出問題在哪') !== -1);
+    ok('體檢 prompt 限制學段標準', HTML.indexOf('不要用更高年級的標準要求') !== -1);
   }
 
   console.log('\n' + '='.repeat(46));

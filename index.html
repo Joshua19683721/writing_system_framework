@@ -210,12 +210,21 @@
         <h3 class="font-black text-base sm:text-lg text-purple-800">✅ 你完成的 108 課綱路徑（10 個選擇）</h3>
         <ul id="pathSummary" class="list-disc list-inside text-slate-700 space-y-1 font-medium leading-relaxed"></ul>
       </div>
+      <div id="pathReviewCard" class="hidden bg-white border-2 border-amber-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <h3 class="font-black text-base sm:text-lg text-amber-800">🔍 作文體檢表</h3>
+          <span id="pathReviewScore" class="text-sm font-black text-amber-700"></span>
+        </div>
+        <p id="pathReviewAdvice" class="text-sm text-slate-700 font-bold"></p>
+        <ul id="pathReviewList" class="space-y-2"></ul>
+      </div>
     </div>
     <div class="no-print grid gap-3 sm:grid-cols-2">
       <button type="button" id="pathCopyBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">📋 複製文章</button>
       <button type="button" id="pathPrintBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">🖨️ 列印 / 存成 PDF</button>
       <button type="button" id="pathRegenBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-black py-3 rounded-2xl transition">🔄 重新寫一次（保留我的選擇）</button>
       <button type="button" id="pathEditBtn" class="bg-white text-purple-700 font-black py-3 rounded-2xl border-2 border-purple-200 hover:bg-purple-50 transition">⬅️ 回去改選擇</button>
+      <button type="button" id="pathReviewBtn" class="sm:col-span-2 bg-white text-amber-700 font-black py-3 rounded-2xl border-2 border-amber-200 hover:bg-amber-50 transition">🔍 重新體檢一次</button>
       <button type="button" id="pathRestartBtn" class="sm:col-span-2 bg-slate-700 hover:bg-slate-800 text-white font-black py-3 rounded-2xl transition">🔄 重新練習另一篇</button>
     </div>
   </section>
@@ -442,7 +451,15 @@
     '4. 保留孩子的口吻，語氣自然，適合國小四年級。',
     '5. 全文約 300～600 字（這是國小記敘文的建議篇幅）。因為孩子只勾了 10 個選項，',
     '   請把每個選擇展開成具體的句子與細節，寫得夠豐富，不要只把選項短短串接。',
-    '6. final_article 段落之間用換行分隔，不要加小標題、序號或項目符號。',
+    '6. 【轉折要寫深】轉折是全文最重要的段落，不能只用一句「後來情況變了」帶過。',
+    '   必須寫清楚三件事：① 怎麼變的（那個具體的瞬間是誰做了什麼或說了什麼）',
+    '   ② 轉折前後的對比（之前怎麼樣、之後又怎麼樣）③ 那一刻的動作、聲音或心裡的感覺。',
+    '7. 【句型與用詞要有變化】',
+    '   · 不要連續好幾句用同一個開頭（例如句句都以「我」或「然後」開頭）。',
+    '   · 善用長短句交錯：關鍵的瞬間用短句收斂，描寫用較長的句子。',
+    '   · 比喻或擬人要貼切、真的幫助別人想像，不可為了華麗而濫用。',
+    '   · 可以用同義詞替換避免重複，但要自然，不可換到語意不清。',
+    '8. final_article 段落之間用換行分隔，不要加小標題、序號或項目符號。',
     '',
     '【語言與格式規範】：',
     '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
@@ -494,7 +511,14 @@
     '3. 只使用孩子選到的內容，不要新增與選擇無關的新論點。',
     '4. 用孩子選到的理由與例子把論點串成通順的段落，可補上連接詞，但不可背離孩子的選擇。',
     '5. 語氣誠懇有禮，尊重反對的人，不要用情緒化或罵人的詞。',
-    '6. 全文約 350～650 字。段落之間用換行分隔，不要加小標題、序號或項目符號。',
+    '6. 【反方與回應要寫深】不能只寫「有人不同意」就帶過。要寫出對方具體的質疑內容，',
+    '   以及孩子如何具體回應（舉例、承認對方合理的部分、或提出折衷做法）。',
+    '7. 【句型與用詞要有變化】',
+    '   · 不要連續好幾句用同一個開頭（例如句句都以「我認為」開頭）。',
+    '   · 說理要有節奏：主張用短句斷開，舉例說明可用較長的句子。',
+    '   · 同義詞可替換避免重複，但不可為了換而換到語意不清。',
+    '   · 避免通篇都是「因為⋯⋯所以⋯⋯」同一個句型。',
+    '8. 全文約 350～650 字。段落之間用換行分隔，不要加小標題、序號或項目符號。',
     '',
     '【語言與格式規範】：',
     '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
@@ -505,6 +529,52 @@
     '  "final_article": "把 10 個選擇組合而成的完整說理文，段落以換行分隔..."',
     '}'
   ].join('\n');
+  /* 產出文章後的體檢表：依文類給不同檢查項目，由模型評估孩子的文章 */
+  var REVIEW_RUBRIC = {
+    narrative: [
+      ['主題明確', '有沒有清楚交代主角、重點與時間地點，讓讀者一看就懂這篇在寫什麼'],
+      ['轉折寫得深', '轉折段落是否有具體瞬間（誰做了什麼或說了什麼）、轉折前後的對比，以及那一刻的心理或動作'],
+      ['五感描寫', '除了「看到」，是否還有聲音、觸覺、氣味等感官細節'],
+      ['心情有變化', '心情是否隨情節改變，而不是從頭到尾同一個情緒'],
+      ['因果連貫', '是否看得出「因為……所以……」的因果鏈'],
+      ['段落分明', '每一段是否各負任務（開頭／經過／轉折／結果），而非混在一起'],
+      ['句型與用詞有變化', '是否有變化句型與長短句交錯，而非句句用同一個開頭；比喻是否貼切不濫用']
+    ],
+    argument: [
+      ['論點明確', '讀完是否清楚知道作者支持哪一邊、理由是什麼'],
+      ['理由有兩個以上', '是否提出至少兩個不同理由，而不是只有一個反覆說'],
+      ['例證具體', '舉的例子是否有名有姓、有時間地點，而不是泛泛地說'],
+      ['正面處理反方', '是否寫出對方的質疑並真的加以回應，而不是一句帶過'],
+      ['回應有說服力', '回應是否具體（舉例／承認對方合理的部分／提出折衷做法），而非換句話重述立場'],
+      ['段落各有功能', '立論、舉例、反駁、結論是否分段清楚'],
+      ['句型與用詞有變化', '句型與用詞是否有變化，而非通篇同一個句型（例如每句都以「我認為」開頭）']
+    ]
+  };
+
+  // 依文類組出體檢表的評分 prompt（kind 要到執行時才知道，所以做成函式）
+  function buildReviewPrompt(kind) {
+    var list = REVIEW_RUBRIC[kind] || REVIEW_RUBRIC.narrative;
+    var items = list.map(function (r, i) { return (i + 1) + '. ' + r[0] + ' —— ' + r[1]; });
+    return [
+      '你是一位嚴格但鼓勵人的國文寫作老師。請就學生這篇文章做一份「體檢表」。',
+      '請用國小四年級（說理文則為國中）的標準檢視，不要用更高年級的標準要求。',
+      '',
+      '【依序檢查以下每一項】',
+      items.join('\n'),
+      '',
+      '【評分標準】',
+      '1. ok=true 代表這項有做到而且做到位；只是提到但太籠統，請給 false。',
+      '2. note 要具體指出問題在哪，或指出做得好在哪，不要只寫「很好」「要加油」。',
+      '3. 語氣鼓勵但誠實，每則 note 控制在 40 字內。',
+      '',
+      '【語言與格式規範】',
+      '1. 全部使用繁體中文（台灣用字），不得出現任何簡體字。',
+      '2. 只輸出合法 JSON，不要加任何解釋文字或 Markdown 符號。',
+      '',
+      '【輸出 JSON 格式】',
+      '{"items": [{"label": "項目名稱", "ok": true, "note": "具體說明"}], "advice": "一句話的總建議"}'
+    ].join('\n');
+  }
 
   /* 首頁三種訓練模式：記敘結構 → 表達反思 → 說理論證 */
   var MODES = {
@@ -588,7 +658,7 @@
     { stage: '起因', question: '事情是怎麼開始的？', options: ['有人提出了一個想法', '突然發生了一個小意外', '比賽或活動開始了', '本來很平常，後來有了變化'] },
     { stage: '五感', question: '當時你看到或聽到什麼？', options: ['聽到熱鬧的聲音', '看到關鍵的那一幕', '聞到特別的味道', '安靜到只聽見自己的心跳'] },
     { stage: '心情', question: '那一刻你心裡的感覺是什麼？', options: ['緊張又期待', '開心又興奮', '擔心或害怕', '又氣又委屈'] },
-    { stage: '轉折', question: '中間發生了什麼變化？', options: ['情況突然變得不一樣', '有人說了一句關鍵的話', '我改變了主意', '出現了意想不到的結果'] },
+    { stage: '轉折', question: '中間發生了什麼變化？（要說得越具體越好）', options: ['情況突然改變了（是什麼改變？）', '有人說了一句關鍵的話（是什麼話？）', '我改變了主意（為什麼改？）', '出現了意想不到的結果（是什麼？為什麼？）' ] },
     { stage: '行動', question: '接著你做了什麼？', options: ['我趕快想辦法解決', '我鼓起勇氣試一次', '我主動開口幫忙或道歉', '我堅持下去沒有放棄'] },
     { stage: '結果', question: '最後怎麼了？', options: ['事情順利完成', '雖然不完美但學到很多', '結果出乎意料', '大家開心地結束'] },
     { stage: '感想', question: '這件事之後，你有什麼感想？', options: ['我學會了堅持', '我更懂得體諒別人', '下次我會做得更好', '我很珍惜這次的經驗'] }
@@ -2090,6 +2160,7 @@
       var article = fixTypos(normalizePathEssay(extractJson(raw)), []);
       renderPathEssay(article);
       showPanel('pathResult');
+      return runPathReview();
     }).catch(function (e) {
       handleError(e, 'pathError', runPathCompose);
     }).finally(function () { hideLoading(); });
@@ -2119,6 +2190,98 @@
       + '　｜　' + new Date().toLocaleDateString('zh-TW');
   }
 
+  // 體檢表：把模型回應整理成固定項目，缺漏以評分表補齊
+  function normalizePathReview(data) {
+    var kind = pathState.kind;
+    var rubric = REVIEW_RUBRIC[kind] || REVIEW_RUBRIC.narrative;
+    var raw = data && Array.isArray(data.items) ? data.items : [];
+    var byLabel = {};
+    for (var i = 0; i < raw.length; i++) {
+      var one = raw[i];
+      if (!one || typeof one !== 'object') continue;
+      var label = firstString(one.label, one.name, one.title, one.item) || '';
+      byLabel[label] = one;
+    }
+    var items = rubric.map(function (r) {
+      var hit = byLabel[r[0]];
+      var ok = !!(hit && (hit.ok === true || hit.ok === 'true' || hit.pass === true));
+      var note = hit ? firstString(hit.note, hit.comment, hit.detail, hit.text, hit.reason) : '';
+      return { label: r[0], ok: ok, note: note || (ok ? '這項有做到。' : '這項還可以再加強。') };
+    });
+    return { items: items, advice: firstString(data.advice, data.summary, data.overall) || '' };
+  }
+
+  function renderPathReview(review) {
+    var card = $('pathReviewCard');
+    var ul = $('pathReviewList');
+    if (!card || !ul) return;
+    ul.textContent = '';
+    var pass = 0;
+    review.items.forEach(function (it) {
+      if (it.ok) pass++;
+      var li = document.createElement('li');
+      li.className = 'flex items-start gap-2 text-sm leading-relaxed';
+      var mark = document.createElement('span');
+      mark.className = 'font-black flex-none';
+      mark.textContent = it.ok ? '✅' : '⚠️';
+      var body = document.createElement('span');
+      var b = document.createElement('b');
+      b.textContent = it.label + '：';
+      var noteEl = document.createElement('span');
+      noteEl.textContent = it.note;
+      body.appendChild(b);
+      body.appendChild(noteEl);
+      if (!it.ok) { body.className = 'text-amber-900'; } else { body.className = 'text-slate-700'; }
+      li.appendChild(mark);
+      li.appendChild(body);
+      ul.appendChild(li);
+    });
+    $('pathReviewScore').textContent = '達到 ' + pass + ' / ' + review.items.length + ' 項';
+    $('pathReviewAdvice').textContent = review.advice ? '💡 ' + review.advice : '';
+    card.classList.remove('hidden');
+  }
+
+  function clearPathReview() {
+    var card = $('pathReviewCard');
+    if (card) card.classList.add('hidden');
+    var ul = $('pathReviewList');
+    if (ul) ul.textContent = '';
+    var sc = $('pathReviewScore');
+    if (sc) sc.textContent = '';
+    var ad = $('pathReviewAdvice');
+    if (ad) ad.textContent = '';
+  }
+
+  // 體檢失敗不該讓文章消失，所以錯誤只寫在卡片內
+  function runPathReview() {
+    var article = $('pathEssay').textContent;
+    if (!article) return Promise.resolve();
+    var card = $('pathReviewCard');
+    if (card && card.classList.contains('hidden')) {
+      card.classList.remove('hidden');
+      var sc = $('pathReviewScore'); if (sc) sc.textContent = '檢查中…';
+    }
+    var user = ['【文章】', article, '', '【孩子的 10 個選擇】'];
+    pathState.questions.forEach(function (q, i) {
+      user.push((i + 1) + '. ' + q.stage + '：' + (answerTextFor(i) || '（未選擇）'));
+    });
+    return callGroq(buildReviewPrompt(pathState.kind), user.join('\n')).then(function (raw) {
+      renderPathReview(normalizePathReview(extractJson(raw)));
+    }).catch(function (e) {
+      var card2 = $('pathReviewCard');
+      if (card2) card2.classList.remove('hidden');
+      var sc = $('pathReviewScore'); if (sc) sc.textContent = '';
+      var ul = $('pathReviewList');
+      if (ul) {
+        ul.textContent = '';
+        var li = document.createElement('li');
+        li.className = 'text-sm text-rose-700 font-bold';
+        li.textContent = '😵 體檢失敗：' + (e && e.message ? e.message : '請再試一次');
+        ul.appendChild(li);
+      }
+    });
+  }
+
   function resetPath() {
     pathState = { topic: '', kind: currentMode().kind, questions: [], answers: [], customs: [] };
     var l = $('pathList'); if (l) l.textContent = '';
@@ -2126,6 +2289,7 @@
     var w = $('pathWordNote'); if (w) w.textContent = '';
     var s = $('pathSummary'); if (s) s.textContent = '';
     var m = $('pathMeta'); if (m) m.textContent = '';
+    clearPathReview();
     clearError('pathError');
     updatePathProgress();
   }
@@ -2411,6 +2575,10 @@
 
     $('startPathBtn').addEventListener('click', startPath);
     $('pathComposeBtn').addEventListener('click', runPathCompose);
+    $('pathReviewBtn').addEventListener('click', function () {
+      showLoading('魔法導師正在幫你檢查這篇文章…');
+      runPathReview().finally(function () { hideLoading(); });
+    });
     $('pathRegenBtn').addEventListener('click', function () {
       var done = updatePathProgress();
       if (done < GUIDED_COUNT) { showPanel('pathSection'); toast('請先完成全部 ' + GUIDED_COUNT + ' 題的選擇。', 'err'); return; }
