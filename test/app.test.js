@@ -841,6 +841,7 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     ok('\u554f\u984c2 \u56de\u7b54\u6846\u4e5f\u80fd\u8a9e\u97f3\u8f38\u5165', env.get('q2').value.indexOf('因為教練提醒大家換位置') !== -1, env.get('q2').value);
     eq('\u56de\u7b54\u4e8c\u4e5f\u5df2\u66ab\u5b58', env.store.get('wsm.a-q2'), env.get('q2').value);
   }
+  const RUBRIC7 = ['主題明確', '轉折寫得深', '五感描寫', '心情有變化', '因果連貫', '段落分明', '句型與用詞有變化'];
   const REVIEW_OK = JSON.stringify({
     items: [
       { label: '主題明確', ok: true, note: '主角與重點清楚。' },
@@ -1542,6 +1543,103 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
        !block.split('narrative: [')[1].split('argument: [')[0].includes("'正面處理反方'"));
     ok('體檢 prompt 要求具體說明', HTML.indexOf('note 要具體指出問題在哪') !== -1);
     ok('體檢 prompt 限制學段標準', HTML.indexOf('不要用更高年級的標準要求') !== -1);
+  }
+
+  console.log('\n== 44. 依體檢弱點針對性改寫（學習迴圈）==');
+  {
+    const REVIEW_WEAK = JSON.stringify({
+      items: [
+        { label: '主題明確', ok: true, note: '清楚。' },
+        { label: '轉折寫得深', ok: false, note: '轉折太籠統，請補上具體瞬間。' },
+        { label: '五感描寫', ok: false, note: '缺少聲音細節。' },
+        { label: '心情有變化', ok: true, note: '有寫出來。' },
+        { label: '因果連貫', ok: true, note: '連得上。' },
+        { label: '段落分明', ok: false, note: '段落混在一起。' },
+        { label: '句型與用詞有變化', ok: true, note: '有變化。' }
+      ],
+      advice: '把轉折寫深一點。'
+    });
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '第一版文章。' })) },
+      { status: 200, body: groqBody(REVIEW_WEAK) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '加強後的第二版文章。' })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+
+    eq('體檢達到 4 / 7', env.get('pathReviewScore').textContent, '達到 4 / 7 項');
+    ok('有弱點時顯示加強按鈕', !env.get('pathFixBtn').classList.contains('hidden'));
+    ok('提示說明會針對幾個弱點', env.get('pathFixTip').textContent.indexOf('3 個弱點') !== -1,
+       env.get('pathFixTip').textContent);
+
+    env.get('pathFixBtn').fire('click');
+    await waitFor(() => env.get('pathEssay').textContent === '加強後的第二版文章。');
+    ok('文章已改寫', env.get('pathEssay').textContent === '加強後的第二版文章。');
+
+    // 改寫時要帶著弱點清單去
+    const gFix = JSON.parse(r.calls[3].opts.body);
+    ok('帶入「特別加強」區塊', gFix.messages[1].content.indexOf('【這次要特別加強的地方】') !== -1);
+    ok('帶入未達標項目', gFix.messages[1].content.indexOf('轉折寫得深：轉折太籠統') !== -1);
+    ok('帶入第二個弱點', gFix.messages[1].content.indexOf('五感描寫：缺少聲音細節。') !== -1);
+    ok('帶入第三個弱點', gFix.messages[1].content.indexOf('段落分明：段落混在一起。') !== -1);
+    ok('已達標項目不列入', gFix.messages[1].content.indexOf('主題明確：清楚。') === -1);
+    ok('要求只改弱點不要整篇重寫',
+       gFix.messages[1].content.indexOf('不要整篇重寫或跑題') !== -1);
+    ok('10 個選擇仍完整帶入', (gFix.messages[1].content.match(/選項A/g) || []).length === 10);
+    eq('改寫後自動再體檢一次', r.calls.length, 5);
+
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+    ok('改寫後重新體檢有結果', env.get('pathReviewScore').textContent.indexOf('/ 7') !== -1);
+  }
+  {
+    // 全部達標時不提供加強按鈕
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '很好的文章。' })) },
+      { status: 200, body: groqBody(JSON.stringify({
+        items: STAGE10.map(function (s, i) { return { label: RUBRIC7[i], ok: true, note: '做到了。' }; }),
+        advice: '都很好' })) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+    eq('全數達標', env.get('pathReviewScore').textContent, '達到 7 / 7 項');
+    ok('沒有弱點時隱藏加強按鈕', env.get('pathFixBtn').classList.contains('hidden'));
+    ok('改顯示讚美語', env.get('pathFixTip').textContent.indexOf('都達標') !== -1,
+       env.get('pathFixTip').textContent);
+  }
+  {
+    // 重新開始後弱點要清乾淨
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) },
+      { status: 200, body: groqBody(JSON.stringify({ final_article: '文章。' })) },
+      { status: 200, body: groqBody(REVIEW_OK) }
+    ], 'gsk_k');
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    pickAll(env, 0);
+    env.get('pathComposeBtn').fire('click');
+    await waitFor(() => env.get('pathReviewList').children.length > 0);
+    ok('體檢卡已顯示', !env.get('pathReviewCard').classList.contains('hidden'));
+    env.get('pathRestartBtn').fire('click');
+    await waitFor(() => env.get('modeSection').classList.contains('hidden') === false);
+    ok('重新開始後體檢卡收起', env.get('pathReviewCard').classList.contains('hidden'));
+    ok('重新開始後加強按鈕收起', env.get('pathFixBtn').classList.contains('hidden'));
+    ok('重新開始後提示清空', env.get('pathFixTip').textContent === '');
+    ok('重新開始後弱點清空', env.get('pathReviewList').children.length === 0);
   }
 
   console.log('\n' + '='.repeat(46));

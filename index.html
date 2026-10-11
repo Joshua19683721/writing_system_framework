@@ -217,6 +217,8 @@
         </div>
         <p id="pathReviewAdvice" class="text-sm text-slate-700 font-bold"></p>
         <ul id="pathReviewList" class="space-y-2"></ul>
+        <p id="pathFixTip" class="text-sm font-bold text-amber-800"></p>
+        <button type="button" id="pathFixBtn" class="hidden bg-amber-600 hover:bg-amber-700 text-white font-black py-3 px-5 rounded-2xl transition">✨ 照著建議把弱點加強</button>
       </div>
     </div>
     <div class="no-print grid gap-3 sm:grid-cols-2">
@@ -1894,7 +1896,7 @@
 
   var GUIDED_COUNT = 10;
 
-  var pathState = { topic: '', kind: 'narrative', questions: [], answers: [], customs: [] };
+  var pathState = { topic: '', kind: 'narrative', questions: [], answers: [], customs: [], weak: [] };
 
   // 依種類挑題庫與 prompt：記敘用 PATH_STAGES，說理用 ARG_STAGES
   function stagesForKind(kind) {
@@ -2144,28 +2146,37 @@
     }).finally(function () { hideLoading(); });
   }
 
-  function runPathCompose() {
-    var done = updatePathProgress();
-    if (done < GUIDED_COUNT) { toast('還有 ' + (GUIDED_COUNT - done) + ' 題沒選完，全部選完才能寫成文章喔。', 'err'); return Promise.resolve(); }
-    clearError('pathError');
-    var isArg = pathState.kind === 'argument';
-    showLoading(isArg ? '魔法導師正在把你的 10 個選擇寫成一篇說理文…'
-                       : '魔法導師正在把你的 10 個選擇寫成一篇文章…');
-    var lines = ['【練習主題】' + (pathState.topic || '（自由發揮）'), '',
-      isArg ? '【孩子完成的說理文寫作路徑選擇】' : '【孩子完成的 108 課綱寫作路徑選擇】'];
-    pathState.questions.forEach(function (q, i) {
-      lines.push((i + 1) + '. ' + q.stage + '（' + q.question + '）：' + (answerTextFor(i) || '（未選擇）'));
-    });
-    return callGroq(composePromptForKind(pathState.kind), lines.join('\n')).then(function (raw) {
-      var article = fixTypos(normalizePathEssay(extractJson(raw)), []);
-      renderPathEssay(article);
-      showPanel('pathResult');
-      return runPathReview();
-    }).catch(function (e) {
-      handleError(e, 'pathError', runPathCompose);
-    }).finally(function () { hideLoading(); });
+function runPathCompose(fixes) {
+  var done = updatePathProgress();
+  if (done < GUIDED_COUNT) { toast('還有 ' + (GUIDED_COUNT - done) + ' 題沒選完，全部選完才能寫成文章喔。', 'err'); return Promise.resolve(); }
+  clearError('pathError');
+  var isArg = pathState.kind === 'argument';
+  // 若有體檢弱點，這次就針對弱點改寫
+  var weak = Array.isArray(fixes) ? fixes.filter(function (f) { return f && f.label; }) : [];
+  showLoading(weak.length
+    ? '魔法導師正在針對弱點加強你的文章…'
+    : (isArg ? '魔法導師正在把你的 10 個選擇寫成一篇說理文…'
+             : '魔法導師正在把你的 10 個選擇寫成一篇文章…'));
+  var lines = ['【練習主題】' + (pathState.topic || '（自由發揮）'), '',
+    isArg ? '【孩子完成的說理文寫作路徑選擇】' : '【孩子完成的 108 課綱寫作路徑選擇】'];
+  pathState.questions.forEach(function (q, i) {
+    lines.push((i + 1) + '. ' + q.stage + '（' + q.question + '）：' + (answerTextFor(i) || '（未選擇）'));
+  });
+  if (weak.length) {
+    lines.push('');
+    lines.push('【這次要特別加強的地方】（上一次體檢發現的弱點，請針對這些改進）：');
+    weak.forEach(function (f) { lines.push('- ' + f.label + '：' + (f.note || '')); });
+    lines.push('請只針對上面列出的弱點加強，其他已經做得到的地方請保持原樣，不要整篇重寫或跑題。');
   }
-
+  return callGroq(composePromptForKind(pathState.kind), lines.join('\n')).then(function (raw) {
+    var article = fixTypos(normalizePathEssay(extractJson(raw)), []);
+    renderPathEssay(article);
+    showPanel('pathResult');
+    return runPathReview();
+  }).catch(function (e) {
+    handleError(e, 'pathError', runPathCompose);
+  }).finally(function () { hideLoading(); });
+}
   function renderPathEssay(article) {
     var isArg = pathState.kind === 'argument';
     var lo = isArg ? 350 : 300, hi = isArg ? 650 : 600;
@@ -2236,7 +2247,13 @@
       li.appendChild(body);
       ul.appendChild(li);
     });
+    pathState.weak = review.items.filter(function (x) { return !x.ok; });
     $('pathReviewScore').textContent = '達到 ' + pass + ' / ' + review.items.length + ' 項';
+    var wb = $('pathFixBtn');
+    if (wb) wb.classList.toggle('hidden', pathState.weak.length === 0);
+    $('pathFixTip').textContent = pathState.weak.length
+      ? '💡 可以針對上面 ' + pathState.weak.length + ' 個弱點加強一次，其他部分會保持原樣'
+      : '🎉 全部項目都達標了，很棒！';
     $('pathReviewAdvice').textContent = review.advice ? '💡 ' + review.advice : '';
     card.classList.remove('hidden');
   }
@@ -2250,6 +2267,11 @@
     if (sc) sc.textContent = '';
     var ad = $('pathReviewAdvice');
     if (ad) ad.textContent = '';
+    var ft = $('pathFixTip');
+    if (ft) ft.textContent = '';
+    var fb = $('pathFixBtn');
+    if (fb) fb.classList.add('hidden');
+    pathState.weak = [];
   }
 
   // 體檢失敗不該讓文章消失，所以錯誤只寫在卡片內
@@ -2283,7 +2305,7 @@
   }
 
   function resetPath() {
-    pathState = { topic: '', kind: currentMode().kind, questions: [], answers: [], customs: [] };
+    pathState = { topic: '', kind: currentMode().kind, questions: [], answers: [], customs: [], weak: [] };
     var l = $('pathList'); if (l) l.textContent = '';
     var e = $('pathEssay'); if (e) e.textContent = '';
     var w = $('pathWordNote'); if (w) w.textContent = '';
@@ -2575,6 +2597,17 @@
 
     $('startPathBtn').addEventListener('click', startPath);
     $('pathComposeBtn').addEventListener('click', runPathCompose);
+    $('pathFixBtn').addEventListener('click', function () {
+      if (!pathState.weak.length) { toast('這次沒有需要加強的地方，很棒！', 'ok'); return; }
+      // 先取出弱點再清空，否則 clearPathReview 會把清單一起清掉
+      var weak = pathState.weak.slice();
+      var before = $('pathEssay').textContent;
+      clearPathReview();
+      runPathCompose(weak).then(function () {
+        var after = $('pathEssay').textContent;
+        if (after && after !== before) toast('已經針對弱點改寫完成，看看體檢有沒有進步！', 'ok');
+      });
+    });
     $('pathReviewBtn').addEventListener('click', function () {
       showLoading('魔法導師正在幫你檢查這篇文章…');
       runPathReview().finally(function () { hideLoading(); });
