@@ -34,21 +34,25 @@
     font-weight:900; font-size:.85rem; display:flex; align-items:center; justify-content:center; }
   .path-stage { flex:none; background:#f3e8ff; color:#6b21a8; font-weight:900; font-size:.75rem;
     padding:.15rem .6rem; border-radius:9999px; }
-  .path-question { font-weight:900; color:#3b0764; }
+  .path-question { font-weight:900; color:#3b0764; font-size:1.05rem; line-height:1.6; }
   .path-options { display:grid; gap:.5rem; grid-template-columns:1fr; }
   @media (min-width:640px) { .path-options { grid-template-columns:1fr 1fr; } }
-  .path-opt { text-align:left; border:2px solid #e9d5ff; border-radius:.75rem; padding:.6rem .75rem;
-    font-weight:700; color:#4b5563; background:#fff; transition:border-color .15s, background .15s; }
+  .path-opt { text-align:left; border:2px solid #e9d5ff; border-radius:.75rem; padding:.65rem .75rem;
+    font-weight:900; color:#374151; background:#fff; font-size:1rem; line-height:1.6;
+    transition:border-color .15s, background .15s; }
   .path-opt:hover { border-color:#a855f7; }
   .path-opt[aria-pressed="true"] { background:#7c3aed; color:#fff; border-color:#7c3aed; }
 
-  /* 第 5 個選項：自己寫。填了就取代上面 4 個選項 */
+  /* 第 5 個選項：自己寫。填了就取代上面 4 個選項（可用麥克風用說的） */
   .path-own { margin-top:.5rem; border:2px dashed #c4b5fd; border-radius:.75rem; background:#faf5ff; padding:.5rem .75rem;
-    display:flex; flex-direction:column; gap:.25rem; transition:border-color .15s, background .15s; }
-  .path-own-label { font-weight:900; color:#6b21a8; font-size:.8rem; }
-  .path-own-input { width:100%; border:0; background:transparent; outline:none; font-weight:700;
-    color:#3b0764; font-size:.95rem; line-height:1.7; }
-  .path-own-input::placeholder { color:#a78bfa; font-weight:600; }
+    display:grid; grid-template-columns:1fr auto; gap:.35rem .5rem; align-items:center;
+    transition:border-color .15s, background .15s; }
+  .path-own-label { grid-column:1 / -1; font-weight:900; color:#6b21a8; font-size:.9rem; }
+  .path-own-input { grid-column:1; min-width:0; width:100%; border:0; background:transparent; outline:none;
+    font-weight:900; color:#3b0764; font-size:1.05rem; line-height:1.7; }
+  .path-own-input::placeholder { color:#a78bfa; font-weight:800; }
+  .path-own-mic { grid-column:2; }
+  .path-own-interim { grid-column:1 / -1; }
   .path-own[data-active="true"] { border-color:#7c3aed; border-style:solid; background:#f3e8ff; }
 
   @media print {
@@ -203,12 +207,12 @@
       <p id="pathMeta" class="hidden text-center text-sm text-slate-600 mb-2"></p>
       <div class="bg-white border-2 border-purple-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
         <h2 class="text-xl sm:text-2xl font-black text-purple-900">📝 你的引導式作文</h2>
-        <div id="pathEssay" class="writing bg-purple-50/50 border border-purple-100 rounded-2xl p-5 text-lg text-slate-800 whitespace-pre-wrap"></div>
+        <div id="pathEssay" class="writing bg-purple-50/50 border border-purple-100 rounded-2xl p-5 text-lg font-medium text-slate-800 whitespace-pre-wrap"></div>
         <p id="pathWordNote" class="text-sm font-bold text-slate-500"></p>
       </div>
       <div class="bg-white border-2 border-purple-100 rounded-3xl p-5 md:p-6 space-y-2 print-plain">
         <h3 class="font-black text-base sm:text-lg text-purple-800">✅ 你完成的 108 課綱路徑（10 個選擇）</h3>
-        <ul id="pathSummary" class="list-disc list-inside text-slate-700 space-y-1 font-medium leading-relaxed"></ul>
+        <ul id="pathSummary" class="list-disc list-inside text-slate-700 space-y-1 font-bold leading-relaxed"></ul>
       </div>
       <div id="pathReviewCard" class="hidden bg-white border-2 border-amber-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
         <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -2044,6 +2048,16 @@
     updatePathProgress();
   }
 
+  // 語音辨識寫入「自己寫」欄位的代理人：寫入時同步跑 onCustomInput，
+  // 這樣用說的答案也會自動取代 4 個選項、更新進度
+  function ownSpeechTarget(qi) {
+    var input = pathCustomInputs[qi];
+    return {
+      get value() { return input.value; },
+      set value(v) { input.value = v; onCustomInput(qi); }
+    };
+  }
+
   var pathOptBtns = [];
   var pathCustomInputs = [];
   var pathOwnBoxes = [];
@@ -2099,14 +2113,22 @@
       var ownInput = document.createElement('input');
       ownInput.type = 'text';
       ownInput.className = 'path-own-input';
-      ownInput.maxLength = 60;
+      ownInput.maxLength = 100;
       ownInput.placeholder = ownFrameFor(q.stage);
       ownInput.setAttribute('aria-label', '第 ' + (qi + 1) + ' 題（' + q.stage + '）自己寫的答案');
       (function (qi) {
         ownInput.addEventListener('input', function () { onCustomInput(qi); });
       })(qi);
+      // 一鍵麥克風：用說的填這一題的「自己寫」
+      var ownInterim = document.createElement('p');
+      ownInterim.className = 'path-own-interim hidden text-xs italic text-rose-500 min-h-[1rem]';
+      ownInterim.setAttribute('aria-live', 'polite');
+      var ownMic = makeMicButton(function () { return ownSpeechTarget(qi); }, ownInterim);
+      ownMic.classList.add('path-own-mic');
       own.appendChild(ownLabel);
       own.appendChild(ownInput);
+      own.appendChild(ownMic);
+      own.appendChild(ownInterim);
       card.appendChild(own);
 
       pathCustomInputs.push(ownInput);

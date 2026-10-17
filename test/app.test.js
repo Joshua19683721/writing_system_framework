@@ -1393,6 +1393,65 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
        li.textContent.slice(0, 40));
   }
 
+  console.log('\n== 40b.「都不適合？我自己寫」欄位有麥克風，一鍵就能用說的 ==');
+  {
+    class FakeSR {
+      constructor() { this.lang = ''; this.continuous = false; this.interimResults = false; FakeSR.last = this; }
+      start() { if (this.onstart) this.onstart(); }
+      stop() { if (this.onend) this.onend(); }
+      emit(text, isFinal) {
+        const item = [{ transcript: text }];
+        item.isFinal = isFinal !== false;
+        if (this.onresult) this.onresult({ resultIndex: 0, results: [item] });
+      }
+    }
+    const ownOf = function (card) { return card.children[2]; };
+    const ownInputOf = function (card) { return ownOf(card).children[1]; };
+    const ownMicOf = function (card) { return ownOf(card).children[2]; };
+
+    // 不支援語音的瀏覽器：麥克風藏起來，打字仍可用
+    const r0 = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) }
+    ], 'gsk_k');
+    const cards0 = r0.env.get('pathList');
+    r0.env.get('randomTopicBtn').fire('click');
+    r0.env.get('startPathBtn').fire('click');
+    await waitFor(() => r0.env.get('pathSection').classList.contains('hidden') === false);
+    ok('不支援語音時自己寫的麥克風隱藏',
+       cards0.children.every(c => ownMicOf(c).classList.contains('hidden')));
+
+    // 支援語音的瀏覽器：每題自己寫都有一顆麥克風
+    const r = await boot([
+      { status: 200, body: groqBody(JSON.stringify({ questions: Q10 })) }
+    ], 'gsk_k', { SpeechRecognition: FakeSR });
+    const env = r.env;
+    env.get('randomTopicBtn').fire('click');
+    env.get('startPathBtn').fire('click');
+    await waitFor(() => env.get('pathSection').classList.contains('hidden') === false);
+    const cards = env.get('pathList').children;
+    ok('10 題自己寫都有麥克風按鈕',
+       cards.every(c => ownOf(c).children.length === 4 && ownMicOf(c).tagName === 'BUTTON'));
+    ok('麥克風按鈕看得懂（用說的）', ownMicOf(cards[0]).textContent.indexOf('用說的') !== -1,
+       ownMicOf(cards[0]).textContent);
+
+    // 按一下就開始說，答案自動取代 4 個選項並更新進度
+    optsOf(cards[0])[1].fire('click');
+    eq('先選第 2 個選項', env.get('pathProgress').textContent, '已回答 1 / 10');
+    ownMicOf(cards[0]).fire('click');
+    FakeSR.last.emit('我表弟也一起來加油');
+    ok('說的答案寫進自己寫欄位', ownInputOf(cards[0]).value.indexOf('我表弟也一起來加油') !== -1,
+       ownInputOf(cards[0]).value);
+    ok('自己寫欄位被標示啟用', ownOf(cards[0]).getAttribute('data-active') === 'true');
+    ok('原本選的按鈕被取代', optsOf(cards[0])[1].getAttribute('aria-pressed') === 'false');
+    eq('語音答案算已作答', env.get('pathProgress').textContent, '已回答 1 / 10');
+
+    // 即時字幕出現在自己寫欄位下方
+    FakeSR.last.emit('還有阿姨也在旁邊', false);
+    ok('即時字幕顯示在自己寫欄位', ownOf(cards[0]).children[3].textContent.indexOf('還有阿姨') !== -1,
+       ownOf(cards[0]).children[3].textContent);
+    FakeSR.last.stop();
+  }
+
   console.log('\n== 41. 產出文章後的體檢表 ==');
   {
     const r = await boot([
