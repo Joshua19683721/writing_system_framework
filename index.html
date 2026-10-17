@@ -151,7 +151,11 @@
         <span id="randomTopicNote" class="text-xs font-bold text-indigo-700"></span>
       </div>
       <div id="customTopicWrap" class="hidden mt-3">
-        <input type="text" id="customTopic" maxlength="30" placeholder="例如：我最喜歡的一個週末" class="w-full px-4 py-2 border-2 border-indigo-200 rounded-xl bg-white focus:outline-none focus:border-indigo-500">
+        <div class="flex items-stretch gap-2">
+          <input type="text" id="customTopic" maxlength="30" placeholder="例如：我最喜歡的一個週末" class="flex-1 min-w-0 px-4 py-2 border-2 border-indigo-200 rounded-xl bg-white focus:outline-none focus:border-indigo-500">
+          <button type="button" id="customTopicMic" class="hidden shrink-0 bg-white text-rose-600 font-black px-3 py-2 rounded-xl border-2 border-rose-200 hover:bg-rose-50 transition">🎙️ 用說的</button>
+        </div>
+        <p id="customTopicInterim" class="hidden text-xs italic text-rose-500 min-h-[1rem] mt-1" aria-live="polite"></p>
       </div>
     </div>
 
@@ -2351,7 +2355,8 @@ function runPathCompose(fixes) {
     listening: false,
     btn: null,      // 正在錄音的按鈕
     target: null,   // 正在寫入的輸入框
-    interim: null   // 顯示即時字幕的元素
+    interim: null,  // 顯示即時字幕的元素
+    replace: false  // 這次的聲音要不要直接取代欄位內容（自訂主題用）
   };
 
   function setInterim(el, text) {
@@ -2391,12 +2396,19 @@ function runPathCompose(fixes) {
     var multiline = field === els.rawText;
     var text = speechToText(s, multiline);
     if (!text) return;
-    var sep = '';
-    if (field.value) {
-      if (multiline && NEWLINE_CMD.test(s)) sep = /\n\s*$/.test(field.value) ? '' : '\n';
-      else if (!/[\s，。！？]$/.test(field.value)) sep = '，';
+    // 取代模式：這是自訂主題那類「一開口就講完」的欄位，
+    // 這次說的話直接換掉整個欄位，不跟舊字接在一起
+    if (speech.replace) {
+      field.value = text;
+      speech.replace = false;
+    } else {
+      var sep = '';
+      if (field.value) {
+        if (multiline && NEWLINE_CMD.test(s)) sep = /\n\s*$/.test(field.value) ? '' : '\n';
+        else if (!/[\s，。！？]$/.test(field.value)) sep = '，';
+      }
+      field.value = field.value + sep + text;
     }
-    field.value = field.value + sep + text;
     if (field === els.rawText) {
       updateCount();
       store.set('draft', field.value);
@@ -2405,16 +2417,36 @@ function runPathCompose(fixes) {
     }
   }
 
-  function toggleSpeech(btn, getField, interimEl) {
+  // 把麥克風綁到某個輸入框。replace＝說的話直接取代整個欄位，
+  // 適合「主題」這種一開口就該講完、不該跟舊字接在一起的欄位
+  function toggleSpeech(btn, getField, interimEl, replace) {
     if (!speech.supported || !speech.rec) return;
+    speech.replace = !!replace;
+    // 上一次辨識還沒收尾（瀏覽器可能正在補送結果）就先切掉，
+    // 不然按鈕會卡在「停止」，再按一次也沒有反應
     if (speech.listening) {
-      try { speech.rec.stop(); } catch (e) { /* ignore */ }
-      return;
+      try { speech.rec.onend = null; speech.rec.stop(); } catch (e) { /* ignore */ }
+      speech.listening = false;
+      setMicState(speech.btn, false);
+      setInterim(speech.interim, '');
+      speech.btn = null;
+      speech.target = null;
+      speech.interim = null;
     }
     speech.btn = btn;
     speech.target = getField();
     speech.interim = interimEl || null;
     try { speech.rec.start(); } catch (e) { /* 已在執行中 */ }
+  }
+
+  // 自訂主題的語音代理人：說的話除了填進框裡，也要存進 customTopic，
+  // 這樣「目前主題」才會真的變成剛剛用說的講的那一個
+  function customTopicSpeechTarget() {
+    var input = els.customTopic;
+    return {
+      get value() { return input.value; },
+      set value(v) { input.value = v; store.set('customTopic', v.trim()); updateBadge(); }
+    };
   }
 
   // 第 2 步每個回答框旁邊的小麥克風
@@ -2435,6 +2467,8 @@ function runPathCompose(fixes) {
       warn.classList.remove('hidden');
     }
     if (els.mic) els.mic.classList.add('hidden');
+    var customMic = $('customTopicMic');
+    if (customMic) customMic.classList.add('hidden');
   }
 
   function setupSpeech() {
@@ -2469,6 +2503,7 @@ function runPathCompose(fixes) {
       speech.btn = null;
       speech.target = null;
       speech.interim = null;
+      speech.replace = false;
     };
 
     recognition.onerror = function (ev) {
@@ -2496,6 +2531,15 @@ function runPathCompose(fixes) {
     if (els.mic) {
       els.mic.addEventListener('click', function () {
         toggleSpeech(els.mic, function () { return els.rawText; }, $('interim'));
+      });
+    }
+
+    // ✏️ 自訂主題的輸入框也能用說的
+    var customMic = $('customTopicMic');
+    if (customMic) {
+      customMic.classList.remove('hidden');
+      customMic.addEventListener('click', function () {
+        toggleSpeech(customMic, customTopicSpeechTarget, $('customTopicInterim'), true);
       });
     }
   }

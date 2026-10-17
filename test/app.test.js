@@ -912,6 +912,59 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     env.get('modeCards').fire('click', { target: cards[idx] });
   };
 
+  console.log('\n== 26c. ✏️ 自訂主題的輸入框也能用說的 ==');
+  {
+    class FakeSR {
+      constructor() { this.lang = ''; this.continuous = false; this.interimResults = false; FakeSR.last = this; }
+      start() { if (this.onstart) this.onstart(); }
+      stop() { if (this.onend) this.onend(); }
+      emit(text, isFinal) {
+        const item = [{ transcript: text }];
+        item.isFinal = isFinal !== false;
+        if (this.onresult) this.onresult({ resultIndex: 0, results: [item] });
+      }
+    }
+    // 不支援語音的瀏覽器：自訂主題的麥克風藏起來
+    const r0 = await boot([], 'gsk_k');
+    ok('不支援語音時自訂主題麥克風隱藏',
+       r0.env.get('customTopicMic').classList.contains('hidden'));
+
+    const r = await boot([], 'gsk_k', { SpeechRecognition: FakeSR });
+    const env = r.env;
+    ok('支援語音時自訂主題麥克風顯示',
+       env.get('customTopicMic').classList.contains('hidden') === false);
+
+    // 點 ✏️ 自訂主題，輸入框出現後用說的
+    const chip = env.make('button');
+    chip.classList.add('topic-chip');
+    chip.setAttribute('data-topic', '__custom__');
+    env.get('topicChips').fire('click', { target: chip });
+    ok('點自訂主題後輸入框出現',
+       env.get('customTopicWrap').classList.contains('hidden') === false);
+
+    env.get('customTopicMic').fire('click');
+    FakeSR.last.emit('我最喜歡的一個週末');
+    eq('說的話填進自訂主題框', env.get('customTopic').value, '我最喜歡的一個週末');
+    eq('自訂主題也存起來', env.store.get('wsm.customTopic'), '我最喜歡的一個週末');
+    ok('主題徽章跟著更新', env.get('topicBadge').textContent.indexOf('週末') !== -1,
+       env.get('topicBadge').textContent);
+
+    // 第二次用說的會「換掉」整個主題，不會跟上一句接在一起
+    env.get('customTopicMic').fire('click');
+    FakeSR.last.emit('運動會的那一天換行我參加大隊接力');
+    eq('新主題取代舊主題', env.get('customTopic').value, '運動會的那一天，我參加大隊接力');
+    ok('不會殘留「換行」字樣', env.get('customTopic').value.indexOf('換行') === -1);
+    eq('存起來的主題也一致', env.store.get('wsm.customTopic'), '運動會的那一天，我參加大隊接力');
+    FakeSR.last.stop();
+
+    // 即時字幕顯示在自訂主題框下方
+    env.get('customTopicMic').fire('click');
+    FakeSR.last.emit('還有弟弟也來加油', false);
+    ok('即時字幕顯示在自訂主題下方',
+       env.get('customTopicInterim').textContent.indexOf('還有弟弟') !== -1,
+       env.get('customTopicInterim').textContent);
+    FakeSR.last.stop();
+  }
   console.log('\n== 27. 108 課綱引導寫作：隨機主題 → 10 題 → 4 選 1 → 合成文章 ==');
   {
     const ESSAY = '第一段：事情的開始。\n\n第二段：經過與轉折。\n\n第三段：結果與感想。';
