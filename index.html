@@ -164,7 +164,7 @@
       <div id="topicHint" class="hidden bg-amber-50 border-2 border-amber-200 rounded-2xl p-3 text-sm text-amber-900 leading-relaxed"></div>
       <textarea id="rawText" rows="6" spellcheck="false" class="w-full text-lg p-4 border-2 border-slate-200 rounded-2xl focus:border-indigo-500 focus:outline-none" placeholder="例如：上個星期六我和同學去打籃球，我們本來輸三球，後來我很努力投進一個三分球，最後我們贏了，我覺得美不勝收，非常開心..."></textarea>
       <p id="interim" class="text-sm italic text-rose-500 min-h-[1.25rem]" aria-live="polite"></p>
-      <p class="text-sm text-emerald-700 font-bold">💡 不用擔心寫錯字，像跟朋友聊天一樣，把發生的事情講出來就好喔！</p>
+      <p class="text-sm text-emerald-700 font-bold">💡 不用擔心寫錯字，像跟朋友聊天一樣，把發生的事情講出來就好喔！想換行時說「換行」或「另起一段」，稿子就會幫你換行。</p>
       <div class="grid gap-3 sm:grid-cols-2">
         <button type="button" id="micBtn" class="bg-rose-500 text-white text-lg font-black py-4 rounded-2xl transition shadow-lg">🎙️ 按下開始說話</button>
         <button type="button" id="clearBtn" class="bg-white text-slate-600 text-lg font-black py-4 rounded-2xl border-2 border-slate-200 hover:bg-slate-50 transition">🧹 清除重打</button>
@@ -204,10 +204,10 @@
 
   <section id="pathResult" class="hidden space-y-5 bg-purple-50 p-5 md:p-6 rounded-3xl border-2 border-purple-200 anim-fade">
     <div id="pathPrintArea" class="space-y-5">
-      <p id="pathMeta" class="hidden text-center text-sm text-slate-600 mb-2"></p>
+      <p id="pathMeta" class="hidden text-center text-sm font-bold text-slate-600 mb-2"></p>
       <div class="bg-white border-2 border-purple-200 rounded-3xl p-5 md:p-6 space-y-3 print-plain">
         <h2 class="text-xl sm:text-2xl font-black text-purple-900">📝 你的引導式作文</h2>
-        <div id="pathEssay" class="writing bg-purple-50/50 border border-purple-100 rounded-2xl p-5 text-lg font-medium text-slate-800 whitespace-pre-wrap"></div>
+        <div id="pathEssay" class="writing bg-purple-50/50 border border-purple-100 rounded-2xl p-5 text-lg font-bold text-slate-800 whitespace-pre-wrap"></div>
         <p id="pathWordNote" class="text-sm font-bold text-slate-500"></p>
       </div>
       <div class="bg-white border-2 border-purple-100 rounded-3xl p-5 md:p-6 space-y-2 print-plain">
@@ -2374,11 +2374,29 @@ function runPathCompose(fixes) {
   }
 
   // 把辨識結果接到任何一個輸入框：口述框同步字數與草稿，回答框同步暫存
+  // 口述時說「換行」「另起一段」，稿子就真的換行；單行欄位（自己寫、回答框）改用逗號
+  var NEWLINE_CMD = /另起[一兩]?[行段]|換行|換一段|分段|空一行|新的一段|新段落/;
+
+  function speechToText(s, multiline) {
+    if (!NEWLINE_CMD.test(s)) return s;
+    var parts = s.split(NEWLINE_CMD)
+      .map(function (p) { return p.replace(/^[，、。\s]+|[，、。\s]+$/g, ''); })
+      .filter(function (p) { return p; });
+    return multiline ? parts.join('\n') : parts.join('，');
+  }
+
   function appendToField(field, t) {
     var s = String(t || '').trim();
     if (!field || !s) return;
-    var sep = field.value && !/[\s，。！？]$/.test(field.value) ? '，' : '';
-    field.value = field.value + sep + s;
+    var multiline = field === els.rawText;
+    var text = speechToText(s, multiline);
+    if (!text) return;
+    var sep = '';
+    if (field.value) {
+      if (multiline && NEWLINE_CMD.test(s)) sep = /\n\s*$/.test(field.value) ? '' : '\n';
+      else if (!/[\s，。！？]$/.test(field.value)) sep = '，';
+    }
+    field.value = field.value + sep + text;
     if (field === els.rawText) {
       updateCount();
       store.set('draft', field.value);

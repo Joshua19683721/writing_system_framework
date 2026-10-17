@@ -841,6 +841,53 @@ ok('\u91cd\u958b\u5f8c step1 \u5df2\u6b78\u85cf\uff08\u4e0d\u76f4\u63a5\u8fdb\u5
     ok('\u554f\u984c2 \u56de\u7b54\u6846\u4e5f\u80fd\u8a9e\u97f3\u8f38\u5165', env.get('q2').value.indexOf('因為教練提醒大家換位置') !== -1, env.get('q2').value);
     eq('\u56de\u7b54\u4e8c\u4e5f\u5df2\u66ab\u5b58', env.store.get('wsm.a-q2'), env.get('q2').value);
   }
+  console.log('\n== 26b. 語音說「換行」「另起一段」就在稿子上換行 ==');
+  {
+    class FakeSR {
+      constructor() { this.lang = ''; this.continuous = false; this.interimResults = false; FakeSR.last = this; }
+      start() { if (this.onstart) this.onstart(); }
+      stop() { if (this.onend) this.onend(); }
+      emit(text, isFinal) {
+        const item = [{ transcript: text }];
+        item.isFinal = isFinal !== false;
+        if (this.onresult) this.onresult({ resultIndex: 0, results: [item] });
+      }
+    }
+    const r = await boot([
+      { status: 200, body: groqBody('{"praise":"很棒","questions":[{"question_text":"A"},{"question_text":"B"}]}') }
+    ], 'gsk_k', { SpeechRecognition: FakeSR });
+    const env = r.env;
+
+    // 口述框（多行）：說「換行」就真的換行
+    env.get('micBtn').fire('click');
+    FakeSR.last.emit('第一段講完了換行第二段開始了');
+    eq('說「換行」稿子就換行', env.get('rawText').value, '第一段講完了\n第二段開始了');
+    ok('字數照算', Number(env.get('charCount').textContent) > 0, env.get('charCount').textContent);
+    ok('草稿也存下換行', env.store.get('wsm.draft').indexOf('\n') !== -1, env.store.get('wsm.draft'));
+
+    FakeSR.last.emit('另起一段第三段是感想');
+    eq('說「另起一段」也換行', env.get('rawText').value,
+       '第一段講完了\n第二段開始了\n第三段是感想');
+
+    FakeSR.last.emit('沒有指令就接在後面');
+    eq('沒說換行就接續原文', env.get('rawText').value,
+       '第一段講完了\n第二段開始了\n第三段是感想，沒有指令就接在後面');
+
+    FakeSR.last.emit('換行');
+    eq('整句只有換行指令就不再多出空白行', env.get('rawText').value,
+       '第一段講完了\n第二段開始了\n第三段是感想，沒有指令就接在後面');
+    FakeSR.last.stop();
+
+    // 單行的回答框：不能塞換行，指令字要消失、改成逗號
+    env.get('toNode1Btn').fire('click');
+    await waitFor(() => env.get('step2').classList.contains('hidden') === false);
+    const mic1 = env.get('questionsContainer').children[0].children[1].children[1];
+    mic1.fire('click');
+    FakeSR.last.emit('我聽到全場的歡呼聲換行大家都跳起來');
+    eq('回答框不塞換行、改成逗號', env.get('q1').value, '我聽到全場的歡呼聲，大家都跳起來');
+    ok('回答框不會殘留「換行」字樣', env.get('q1').value.indexOf('換行') === -1, env.get('q1').value);
+    FakeSR.last.stop();
+  }
   const RUBRIC7 = ['主題明確', '轉折寫得深', '五感描寫', '心情有變化', '因果連貫', '段落分明', '句型與用詞有變化'];
   const REVIEW_OK = JSON.stringify({
     items: [
